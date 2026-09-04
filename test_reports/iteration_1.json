@@ -1,0 +1,70 @@
+{
+  "summary": "Full e2e test of BidanKu (FastAPI+Mongo+React). Backend: 32 pytest cases across auth, protected routes, dashboard, patients CRUD, checkups, persalinan/nifas, security -> 25 pass / 7 fail (78%). Frontend: login (valid+invalid), dashboard stats & Perlu Tindakan, patient list filters/search, add patient (K1 = HPHT+12w & HPL = HPHT+280d verified in UI), edit patient, record checkup (table + BP/weight charts populate, status advances to K2/Sudah Kontrol), WA reminder modal (3 templates, copy w/ 'Tersalin!' feedback, wa.me URL encoded), mark persalinan (fase -> Nifas, KF1 = persalinan+2d), delete checkup, delete patient (confirm), logout + protected-route redirect, mobile drawer -- all working (~92%). Main defects: nifas status logic masks overdue KF visits, and invalid dates return 500 instead of 400.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/patients, /api/dashboard (compute_status in server.py:98-144)",
+        "issue": "Nifas status is masked by pre-delivery ANC checkups. `last` is computed from ALL checkups (ANC + KF) while `done` only counts jenis=='kf'. A patient with an ANC visit who then delivers gets status 'sudah_kontrol' even when KF1 (persalinan+2 days) is already overdue -> overdue nifas mothers never appear in 'Terlambat'/'Perlu Tindakan', defeating the core purpose of the app. Reproduced: HPHT-39w, ANC checkup today, persalinan 5 days ago => jadwal_berikutnya KF1 in the past, status='sudah_kontrol' (expected 'terlambat'). Fix: compute `last` only from checkups of the current phase (jenis=='kf' when persalinan set, else 'anc').",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "POST/PUT /api/patients, POST /api/patients/{id}/checkups, PUT /api/patients/{id}/persalinan",
+        "issue": "Bare `date.fromisoformat(...)` raises ValueError -> HTTP 500 Internal Server Error for malformed dates (e.g. hpht='bukan-tanggal', tanggal='31-12-2026', tanggal_persalinan='aaa'). Should be 400/422 with an Indonesian message. Use a Pydantic field validator or try/except -> HTTPException(400).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {"endpoint": "POST /api/auth/login", "issue": "No brute-force protection / rate limiting: 6 consecutive wrong passwords all return 401, no 429 or lockout (playbook expects lockout after 5 fails)."},
+      {"endpoint": "Auth transport", "issue": "JWT is returned in the JSON body and stored in localStorage; no httpOnly cookie (XSS token-theft exposure). CORS_ORIGINS defaults to '*' while allow_credentials=True, which browsers reject for credentialed requests -- set explicit origins."},
+      {"endpoint": "PUT /api/patients/{id}/persalinan", "issue": "No sanity validation: tanggal_persalinan before HPHT (accepted 300 days before HPHT, 200 OK) or in the future is accepted -> produces negative 'Nifas hari ke -N'."},
+      {"endpoint": "POST /api/patients", "issue": "Future HPHT accepted (200) -> negative gestational age. Also no validation on no_wa format, and gravida/para/abortus accept negative values."},
+      {"endpoint": "GET /api/patients & /api/dashboard", "issue": "N+1 queries: one checkups find() per patient in a Python loop (patient_with_checkups). Will not scale; use a single $in / aggregate lookup."},
+      {"endpoint": "compute_status", "issue": "Patients past HPL with no checkups stay 'trimester_3' with kunjungan K1 forever (e.g. seeded Rina Marlina shows '52 mgg 4 hr'). No 'lewat HPL' flag/alert."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Modal", "issue": "Escape key does not close modals (WA reminder / forms); only the X button works. Also no click-on-backdrop close.", "selector": "[data-testid$='-close-button']", "priority": "LOW"},
+      {"component": "Layout sidebar", "issue": "Duplicate data-testid values -- sidebar-user-name (and nav item testids) are rendered twice (desktop + mobile drawer), causing Playwright strict-mode violations. Suffix mobile instances (e.g. sidebar-user-name-mobile).", "selector": "[data-testid='sidebar-user-name']", "priority": "LOW"},
+      {"component": "WaReminder", "issue": "Message reads 'dari Bidan Bidan Admin' because the literal 'Bidan ' prefix is concatenated with user.nama which already contains 'Bidan'. Cosmetic duplication in the patient-facing message.", "selector": "[data-testid='wa-message-textarea']", "priority": "LOW"},
+      {"component": "WaReminder copy", "issue": "navigator.clipboard has no fallback: when the Clipboard API is unavailable/denied the toast shows 'Gagal menyalin pesan' with no alternative (works when permission granted -> 'Tersalin!'). Add a textarea select+execCommand fallback.", "selector": "[data-testid='wa-copy-button']", "priority": "LOW"},
+      {"component": "Patients search", "issue": "Search matches no_wa with a raw substring; searching the 62-prefixed number shown on the WhatsApp button (e.g. '62812345678') returns 0 rows although the patient exists as '081234567804'. Normalise 0/62/+62 before matching.", "selector": "[data-testid='patient-search-input']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Detail Pasien / Daftar Pasien", "issues": ["Nifas patient with an overdue KF1 (3 Sep vs today 4 Sep) is displayed with the green 'Sudah Kontrol' badge -- direct UI symptom of the backend compute_status bug; the bidan gets no visual warning.", "Patient form uses native date inputs (browser default picker) rather than a shadcn calendar; acceptable but inconsistent with the rest of the design system."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_status_logic.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: In compute_status, derive `last` (kontrol_terakhir used for the 'sudah_kontrol' check) only from checkups of the active phase (jenis=='kf' for nifas, 'anc' otherwise) so overdue KF visits are reported as 'terlambat'.",
+    "HIGH: Wrap/validate all date.fromisoformat() calls (patients POST/PUT, checkups POST, persalinan PUT) and return 400/422 with an Indonesian message instead of 500.",
+    "Validate tanggal_persalinan >= hpht and not in the future; reject future HPHT and negative G/P/A.",
+    "Add login rate limiting / lockout after 5 failed attempts; set explicit CORS_ORIGINS instead of '*' with allow_credentials=True.",
+    "Normalise phone numbers (0 / 62 / +62) in the patient search filter.",
+    "De-duplicate data-testid attributes between desktop sidebar and mobile drawer; add Escape/backdrop close to Modal; add clipboard fallback; fix 'Bidan Bidan Admin' wording.",
+    "Optional: replace the N+1 checkup queries in /api/patients and /api/dashboard with a single aggregated query; flag patients past HPL."
+  ],
+  "critical_code_review_comments": [
+    "server.py compute_status(): `last = max(dates of ALL checkups)` combined with phase-specific `done` counting is the root cause of the masked-overdue-nifas bug; phase filtering must be applied consistently.",
+    "server.py: date parsing is done imperatively in handlers (date.fromisoformat) instead of via Pydantic validators, so every malformed date is a 500 rather than a validation error.",
+    "server.py list_patients/dashboard: awaits a DB query per patient inside a for-loop (N+1).",
+    "PUT /api/patients uses $set with the full PatientInput model, so any field omitted by a client is reset to its default (e.g. alamat/riwayat wiped) -- consider exclude_unset or a dedicated update model.",
+    "Auth token in localStorage (no httpOnly cookie) and CORS default '*' with allow_credentials=True are security weaknesses."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_status_logic.py"
+  ],
+  "success_rate": {"backend": "78% (25/32)", "frontend": "92%"},
+  "seed_data_creation": "Created TEST_-prefixed patients + checkups via API/UI during testing; all removed afterwards. Remaining DB patients are the original 4 seeds (Rina Marlina, Anisa Putri, Dewi Lestari, Siti Rahmawati) with original names restored after the edit test.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin / admin123 (from /app/memory/test_credentials.md) - works on /api/auth/login and UI /login; admin bcrypt hash verified to start with $2b$ and seed re-syncs password.",
+  "context_for_next_testing_agent": "Test suites live in /app/backend/tests/ (backend_test.py = auth/CRUD/checkups/persalinan; test_status_logic.py = status edge cases). Run: cd /app/backend && python -m pytest tests/ -v (pytest.ini enables xdist). Known-failing tests are real defects: 3x 500 on invalid dates, no login lockout, nifas status masking, missing delivery/HPHT date sanity checks. All UI flows (login, dashboard, list filters/search, add/edit/delete patient, checkup+charts, WA modal templates/copy/wa.me link, mark persalinan, delete checkup, logout, protected redirect, mobile drawer) were verified working. Delete actions use window.confirm -> handle with page.once('dialog', lambda d: d.accept()). Clipboard test requires context.grant_permissions(['clipboard-read','clipboard-write']).",
+  "rca_of_the_issue": "compute_status() computes `done` (visits completed) using a phase filter (jenis=='kf' or 'anc') but computes `last` (date of latest visit) from every checkup. After a delivery is recorded, the patient's last ANC visit date is still >= prev_date (the delivery date), so the 'sudah_kontrol' branch fires before the 'terlambat' branch and an overdue KF1 is reported as already-done. Repro: create patient HPHT-39w, POST an ANC checkup dated today, then PUT persalinan with today-5d => jadwal_berikutnya = today-3d but status='sudah_kontrol'. Mitigation: filter checkups by the active phase before computing `last`/`kontrol_terakhir`."
+}

@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration-2 REGRESSION test of BidanKu after iteration_1 fixes. Backend: 44 pytest cases (backend_test.py 32 + test_status_logic.py 3 + new test_regression_iter2.py 12) -> 44/44 PASS (100%). All 6 iteration_1 backend defects verified fixed: (1) compute_status now phase-filters checkups (ANC-today + persalinan 5d ago => status 'terlambat', jadwal_berikutnya = persalinan+2 = KF1, kontrol_terakhir null, patient appears in /api/dashboard perlu_tindakan and stats.terlambat), (2) malformed/future HPHT, negative G/P/A (gravida<1, para<0), invalid date on PUT /patients, future checkup date, future persalinan and persalinan<HPHT all return 400 with Indonesian messages (no 500s), (3) login lockout: 5x wrong password => 401 x5, 6th => 429 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.' and the CORRECT password is also rejected with 429 during lockout. Frontend (Playwright, 1920x1080): login, dashboard, patient list, 62/+62/0-prefix WA search normalisation, WA modal 3 templates (no 'Bidan Bidan' duplication -> 'salam sehat dari Bidan Admin'), copy w/ toast, wa.me/62... link, Escape-close on WA + patient-form modals, add patient, record ANC checkup (charts + riwayat), mark persalinan 5d ago -> Nifas badge + TERLAMBAT badge + KF1 1 Sep 2026, overdue-nifas patient present in dashboard 'Perlu Tindakan', delete patient, logout, invalid-login error -> all PASS (100%). Playbook auth checks: bcrypt hash $2b$12$ OK, seed_admin re-syncs password on restart OK (verified by overwriting hash + restarting backend), brute-force lockout OK; httpOnly cookie NOT used (JWT in JSON body + localStorage) and CORS_ORIGINS still '*' with allow_credentials=true. login_attempts collection cleared; DB left with the original 4 seed patients, 0 checkups, 0 login_attempts, admin able to log in.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (auth transport)", "issue": "Playbook items 2 & 3 still unmet: JWT is returned in the JSON body and stored in localStorage (no httpOnly cookie; only Cloudflare's __cf_bm cookie is set), and CORS responds with 'access-control-allow-origin: *' together with 'access-control-allow-credentials: true' (browsers reject credentialed requests with wildcard origin). Set explicit CORS_ORIGINS."},
+      {"endpoint": "POST /api/auth/login (lockout)", "issue": "Lockout counter is never reset by time: after locked_until expires, login_attempts.count stays >=5, so a single further wrong password immediately re-locks for another 15 minutes (no 5-attempt window reset). Also no per-IP dimension -> a known username can be locked out by anyone (account-lockout DoS)."},
+      {"endpoint": "GET /api/patients & /api/dashboard", "issue": "Still N+1: one db.checkups.find() per patient inside a Python for-loop (patient_with_checkups). Fine for 4 patients, will not scale."},
+      {"endpoint": "PUT /api/patients/{id}", "issue": "Uses $set with the full PatientInput model, so fields omitted by a client are reset to defaults (alamat/riwayat/catatan wiped). Use exclude_unset or a dedicated update model."},
+      {"endpoint": "compute_status", "issue": "jumlah_kontrol counts ALL checkups (ANC+KF) while kontrol_terakhir is phase-scoped, so a fresh nifas patient shows 'Total Kontrol 1x' with 'Kontrol Terakhir -'. Cosmetically inconsistent (UI screenshot confirmed)."},
+      {"endpoint": "POST /api/patients", "issue": "no_wa still has no format validation (any string accepted)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Detail Pasien", "issues": ["'Total Kontrol 1x' displayed next to 'Kontrol Terakhir -' for a just-delivered patient (backend jumlah_kontrol not phase-scoped) - minor confusion for the bidan.", "Riwayat Kontrol still labels the pre-delivery visit 'K1' after the phase switched to Nifas; acceptable as history but a 'ANC/KF' column would be clearer.", "Patient/checkup/delivery forms still use native browser date inputs instead of a shadcn calendar (unchanged from iteration_1, cosmetic)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_status_logic.py",
+    "/app/backend/tests/test_regression_iter2.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional hardening: set explicit CORS_ORIGINS (not '*') since allow_credentials=True, and consider httpOnly cookie for the JWT.",
+    "Optional: reset login_attempts.count after the lockout window expires (currently count stays >=5 so one wrong password re-locks immediately).",
+    "Optional: make jumlah_kontrol phase-scoped (or show 'Total kontrol (semua fase)') so it matches kontrol_terakhir.",
+    "Optional: replace N+1 checkup queries in /api/patients and /api/dashboard with a single aggregation; use exclude_unset in PUT /api/patients."
+  ],
+  "critical_code_review_comments": [
+    "compute_status now derives both `done` and `last` from phase_checks - root cause of the iteration_1 masking bug is properly fixed and covered by tests (status 'terlambat', kontrol_terakhir None).",
+    "Date/GPA validation is centralised in parse_date/validate_patient_dates/validate_gpa; consider moving to Pydantic field validators so 422 semantics are consistent, but current 400 + Indonesian detail is acceptable.",
+    "server.py is 407 lines - still fine, but login/patients/checkups could be split into routers before it grows further.",
+    "Lockout state is keyed only on username with no window reset and no IP component - review before production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_regression_iter2.py",
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (44/44)", "frontend": "100% (all regression + sanity flows)"},
+  "seed_data_creation": "Created and deleted TEST_-prefixed patients via API and UI ('TEST_UI Regresi'). Admin password_hash was temporarily overwritten to verify seed re-sync and restored automatically by startup seeding (admin/admin123 works). db.login_attempts emptied. DB now: 4 original seed patients (Rina Marlina, Anisa Putri, Dewi Lestari, Siti Rahmawati), 0 checkups, 0 login_attempts.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin / admin123 (verified working after all tests; login_attempts cleared)",
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/ -q (pytest.ini uses -n 2 --dist loadscope; use -n 0 for the lockout tests to avoid racing other classes' logins). test_regression_iter2.py::TestLockout clears db.login_attempts before and after itself, and TestBruteForce in backend_test.py now also clears it - always confirm `mongosh test_database --eval 'db.login_attempts.countDocuments({})'` is 0 before finishing. UI testids: nav-dashboard / nav-pasien (mobile variants suffixed -mobile), patient-form-nama/-wa/-hpht/-submit, record-checkup-button, checkup-form-sistolik/-diastolik/-bb/-tfu/-djj/-submit, mark-delivery-button + delivery-date-input + delivery-submit-button, wa-template-{rutin|terlambat|nifas}, status-badge-{status}, fase-badge-{fase}. Dashboard is at '/' (not /dashboard). Deletes use window.confirm -> page.once('dialog', d.accept()).",
+  "rca_of_the_issue": "No new defects. Iteration_1 root cause (compute_status mixing all checkups for `last` while phase-filtering `done`) is fixed by computing both from phase_checks; verified by API (status='terlambat', kontrol_terakhir=None, dashboard perlu_tindakan) and by UI (red TERLAMBAT badge on a 5-day postpartum patient with a prior ANC visit). Remaining findings are non-blocking hardening/cosmetic items."
+}

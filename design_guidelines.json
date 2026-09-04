@@ -1,0 +1,174 @@
+{
+  "project_info": {
+    "name": "BidanKu / MaternalCare - Sistem Monitoring Ibu Hamil & Nifas",
+    "type": "Healthcare Dashboard / Clinical Monitoring SaaS",
+    "language": "Bahasa Indonesia",
+    "archetype": "Organic & Earthy Warm Clinical (Trust, Care, High Scannability)",
+    "file_extension": "js"
+  },
+  "typography": {
+    "font_family_heading": "Plus Jakarta Sans, sans-serif",
+    "font_family_body": "Plus Jakarta Sans, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "forbidden_fonts": ["Space Grotesk", "Inter for H1/H2 headings"],
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
+    "scale": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-bold tracking-tight",
+      "h4": "text-lg sm:text-xl font-semibold",
+      "body_large": "text-base font-normal leading-relaxed",
+      "body": "text-sm font-normal leading-normal",
+      "caption": "text-xs font-medium tracking-wider uppercase text-muted-foreground"
+    }
+  },
+  "colors": {
+    "theme_mode": "Light mode primary (Clinical warmth) with dark mode toggle capability",
+    "forbidden_colors": ["#1B93A4", "#7351B7"],
+    "palette": {
+      "primary": {
+        "hex": "#C02650",
+        "hsl": "344 67% 45%",
+        "label": "Maternal Rose / Deep Blush (Primary Brand & Key Actions)"
+      },
+      "primary_hover": {
+        "hex": "#A01B40",
+        "hsl": "344 71% 37%",
+        "label": "Deep Rose Hover"
+      },
+      "primary_light": {
+        "hex": "#FDF2F5",
+        "hsl": "344 80% 97%",
+        "label": "Soft Rose Tint (Subtle badge & card backgrounds)"
+      },
+      "secondary": {
+        "hex": "#0F172A",
+        "hsl": "222 47% 11%",
+        "label": "Slate Navy (Text & Contrast Headers)"
+      },
+      "background_light": {
+        "hex": "#FAF8F5",
+        "hsl": "38 33% 97%",
+        "label": "Warm Off-White / Natural Linen"
+      },
+      "surface_card": {
+        "hex": "#FFFFFF",
+        "hsl": "0 0% 100%",
+        "label": "Pure White Surface"
+      },
+      "border": {
+        "hex": "#E2E8F0",
+        "hsl": "214 32% 91%",
+        "label": "Subtle Cool Border"
+      },
+      "status_badges": {
+        "sudah_kontrol": {
+          "bg": "bg-emerald-50 dark:bg-emerald-950/40",
+          "text": "text-emerald-700 dark:text-emerald-400",
+          "border": "border-emerald-200 dark:border-emerald-800",
+          "label": "Sudah Kontrol (Normal / Complete)"
+        },
+        "hari_ini": {
+          "bg": "bg-rose-50 dark:bg-rose-950/40",
+          "text": "text-rose-700 dark:text-rose-400",
+          "border": "border-rose-200 dark:border-rose-800",
+          "label": "Jadwal Hari Ini (Urgent Attention)"
+        },
+        "mendekati": {
+          "bg": "bg-amber-50 dark:bg-amber-950/40",
+          "text": "text-amber-700 dark:text-amber-400",
+          "border": "border-amber-200 dark:border-amber-800",
+          "label": "Mendekati Kontrol (Upcoming)"
+        },
+        "terlambat": {
+          "bg": "bg-red-100 dark:bg-red-950/60",
+          "text": "text-red-700 dark:text-red-300 font-bold",
+          "border": "border-red-300 dark:border-red-800",
+          "label": "Terlambat / Overdue (Critical Risk)"
+        },
+        "fase_nifas": {
+          "bg": "bg-purple-50 dark:bg-purple-950/40",
+          "text": "text-purple-700 dark:text-purple-400",
+          "border": "border-purple-200 dark:border-purple-800",
+          "label": "Fase Nifas (Postpartum)"
+        },
+        "trimester_1": {
+          "bg": "bg-sky-50 dark:bg-sky-950/40",
+          "text": "text-sky-700 dark:text-sky-400",
+          "border": "border-sky-200 dark:border-sky-800",
+          "label": "Trimester 1"
+        },
+        "trimester_2": {
+          "bg": "bg-indigo-50 dark:bg-indigo-950/40",
+          "text": "text-indigo-700 dark:text-indigo-400",
+          "border": "border-indigo-200 dark:border-indigo-800",
+          "label": "Trimester 2"
+        },
+        "trimester_3": {
+          "bg": "bg-rose-50 dark:bg-rose-950/40",
+          "text": "text-rose-700 dark:text-rose-400",
+          "border": "border-rose-200 dark:border-rose-800",
+          "label": "Trimester 3"
+        }
+      }
+    }
+  },
+  "layout_and_grid": {
+    "dashboard_mode": "High Density Grid (MODE B) with Tactical Scannability",
+    "sidebar": "Fixed responsive left navigation panel (Collapsible on mobile) with logo, quick stats counter, navigation routes (Dashboard, Daftar Pasien, Jadwal Kontrol, Pengaturan), user bidan info profile pill, and logout button.",
+    "topbar": "Sticky glass header with live date/time display, global search bar (cari nama/no WA), filter quick actions, and notification trigger for due/overdue patients.",
+    "grid_structure": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6",
+    "container_padding": "px-4 py-6 md:px-8 md:py-8"
+  },
+  "component_rules": {
+    "cards": "Dense, crisp borders (`border border-slate-200/80 dark:border-slate-800`), rounded-xl, hover shadow-md transition-all. Internal padding p-5 or p-6.",
+    "tables": "Shadcn/UI or customized Tailwind table with alternating subtle row highlights, sticky header, multi-column sorting, filter tabs (Semua, Trimester 1-3, Nifas, Hari Ini, Terlambat, Sudah Kontrol), and inline WhatsApp action buttons.",
+    "forms": "Use Shadcn Dialog/Sheet for Add/Edit Patient & Record Checkup. Use proper labels, helper texts, structured input masks (e.g. WA format starting with 62 or 08), HPHT datepicker automatically calculating HPL and gestational age.",
+    "modals": "WhatsApp Reminder Modal with pre-generated custom message template, copy-to-clipboard button with visual checkmark feedback, and direct 'Kirim Via WhatsApp Web/App' button opening `https://wa.me/62...`."
+  },
+  "whatsapp_integration_patterns": {
+    "url_format": "https://wa.me/{sanitized_phone}?text={encoded_message}",
+    "message_templates": {
+      "reminder_rutin": "Halo Ibu {nama_pasien}, salam sehat dari Klinik Bidan {nama_bidan}. Mengingatkan jadwal rutin kontrol kehamilan (Usia Kehamilan: {usia_kehamilan}) pada tanggal {tanggal_jadwal}. Mohon datang tepat waktu untuk memantau kesehatan Ibu & Janin. Terima kasih! 🙏❤️",
+      "reminder_terlambat": "Halo Ibu {nama_pasien}, jadwal kontrol kehamilan Ibu seharusnya pada {tanggal_jadwal} ({hari_terlambat} hari yang lalu). Kesehatan Ibu dan si kecil sangat penting, yuk segera lakukan pemeriksaan di klinik Bidan {nama_bidan}. Balas pesan ini jika ingin penjadwalan ulang.",
+      "reminder_nifas": "Halo Ibu {nama_pasien}, selamat atas kelahiran si buah hati! Mengingatkan jadwal kunjungan nifas (KF-{kf_ke}) pada {tanggal_jadwal} untuk pemeriksaan kondisi pemulihan Ibu dan tumbuh kembang bayi."
+    }
+  },
+  "medical_data_visualization": {
+    "blood_pressure": "Line chart tracking Sistolik & Diastolik over checkup dates with safe zone band (90-120 / 60-80 mmHg) and alert indicators for hypertension risk (>140/90 mmHg).",
+    "weight_gain": "Line chart comparing actual weight curve against recommended gestational weight gain band.",
+    "checkup_timeline": "Vertical stepper timeline highlighting HPHT, ANC 1-6 milestone checkups, HPL (Hari Perkiraan Lahir), and KF 1-4 (Kunjungan Nifas)."
+  },
+  "image_urls": {
+    "doctor_examining_baby": "https://images.unsplash.com/photo-1632053002928-1919605ee6f7?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "pregnant_care_ultrasound": "https://images.pexels.com/photos/7108418/pexels-photo-7108418.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "doctor_holding_newborn": "https://images.pexels.com/photos/3259629/pexels-photo-3259629.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "maternal_care_consultation": "https://images.unsplash.com/photo-1632053651899-3389100579fb?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "instructions_to_main_agent": [
+    "Build the web application using React (.js) with Tailwind CSS, Shadcn UI components, Lucide icons, Recharts for vitals, and Sonner for notifications.",
+    "Ensure UI is completely in Bahasa Indonesia as per user choice.",
+    "Implement mock database state pre-populated with realistic Indonesian patient data (e.g. Siti Rahmawati, Dewi Lestari, Anisa Putri) spanning Trimester 1, 2, 3, Overdue, and Postpartum Nifas (KF1-KF4).",
+    "Support full CRUD operations for patients: Add new patient with HPHT calculation (automatically computes HPL and checkup schedules), Edit patient details, Record new checkup (Tekanan Darah, Berat Badan, Tinggi Fundus, DJJ, Catatan Bidan, Status Selesai), and Delete patient.",
+    "Implement WhatsApp Reminder Modal with multi-template selection (Jadwal Rutin, Terlambat Kontrol, Kunjungan Nifas), customizable text, Copy to Clipboard button (using navigator.clipboard with toast notification), and Direct `wa.me` trigger link.",
+    "Filter patients by Status: 'Semua', 'Hari Ini', 'Minggu Ini', 'Terlambat Kontrol', 'Trimester 1-3', 'Fase Nifas', 'Sudah Kontrol'.",
+    "In Patient Detail view, display pregnancy timeline tracker, interactive vitals chart (Tekanan Darah & BB over time), complete checkup history table, and quick 'Selesai Kontrol' recording modal.",
+    "Login flow: Username & Password login form (default demo creds: bidan / bidan123) with state persistence in localStorage.",
+    "Include data-testid on all interactive buttons, inputs, links, badges, and modals for test stability."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (e.g., `transition: all`). Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, i.e. do not add `.App { text-align: center; }` in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons. Use Lucide React icons instead.",
+    "Every interaction needs micro-animations - hover states, transitions, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "All interactive and key informational elements MUST include a data-testid attribute."
+  ]
+}
