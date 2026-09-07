@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Trash2, BookOpen } from "lucide-react";
+import { Send, Trash2, BookOpen, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import api, { apiError } from "../lib/api";
+import EdukasiBlast from "../components/EdukasiBlast";
 
 const TABS = [
   ["trimester_1", "Trimester 1"],
@@ -16,6 +17,7 @@ export default function Edukasi() {
   const [tab, setTab] = useState("trimester_1");
   const [isi, setIsi] = useState("");
   const [sending, setSending] = useState(false);
+  const [blastOpen, setBlastOpen] = useState(false);
   const bottomRef = useRef(null);
 
   const load = () => api.get("/edukasi").then((r) => setData(r.data));
@@ -24,6 +26,7 @@ export default function Edukasi() {
   }, []);
 
   const messages = data?.[tab] || [];
+  const faseLabel = (TABS.find(([k]) => k === tab) || ["", "fase ini"])[1];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,14 +56,24 @@ export default function Edukasi() {
 
   return (
     <div data-testid="edukasi-page" className="max-w-3xl">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-11 h-11 rounded-2xl bg-[#C02650] flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-white" />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-[#C02650] flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Edukasi Pasien</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Tulis materi edukasi per fase kehamilan & nifas di sini.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Edukasi Pasien</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Tulis materi edukasi per fase kehamilan & nifas di sini.</p>
-        </div>
+        <button
+          data-testid="edukasi-blast-button"
+          onClick={() => setBlastOpen(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#25D366]/10 text-[#128C4A] border border-[#25D366]/30 hover:bg-[#25D366]/20 transition-colors"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Kirim ke WA Pasien
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -118,7 +131,7 @@ export default function Edukasi() {
           <input
             data-testid="edukasi-input"
             className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
-            placeholder={`Tulis edukasi untuk ${(TABS.find(([k]) => k === tab) || ["", "fase ini"])[1]}...`}
+            placeholder={`Tulis edukasi untuk ${faseLabel}...`}
             value={isi}
             onChange={(e) => setIsi(e.target.value)}
           />
@@ -133,6 +146,8 @@ export default function Edukasi() {
           </button>
         </form>
       </div>
+
+      <EdukasiBlast open={blastOpen} onClose={() => setBlastOpen(false)} fase={tab} faseLabel={faseLabel} messages={messages} />
     </div>
   );
 }

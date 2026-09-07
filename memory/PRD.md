@@ -33,6 +33,9 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Menu Edukasi (/edukasi): chatbox per fase (Trimester 1-4, Masa Nifas), bidan menulis/menghapus materi edukasi (GET/POST/DELETE /api/edukasi)
 - Testing iterasi 3: 54/54 backend pass, 100% frontend pass
 
+## Iterasi 3 (Sept 2026)
+- Kirim Edukasi ke WA: tombol "Kirim ke WA Pasien" di tiap tab edukasi — modal menyiapkan pesan gabungan dari chatbox fase tsb (bisa diedit/disalin) + daftar pasien penerima otomatis sesuai fase (T1/T2/T3 → fase trimester terkait, Masa Nifas → nifas ≤42 hari, Trimester 4 → nifas >42 hari), tinggal klik "Kirim WA" per pasien (wa.me pre-filled). Komponen: EdukasiBlast.jsx.
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)
