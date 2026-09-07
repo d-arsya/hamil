@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2,
+  ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2, Gift, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
@@ -75,6 +75,16 @@ export default function PatientDetail() {
     navigate("/pasien");
   };
 
+  const toggleKupon = async () => {
+    try {
+      await api.put(`/patients/${p.id}/kupon`, { diklaim: !p.kupon_diklaim });
+      toast.success(p.kupon_diklaim ? "Klaim kupon dibatalkan" : "Kupon ditandai sudah dipakai");
+      load();
+    } catch {
+      toast.error("Gagal memperbarui status kupon");
+    }
+  };
+
   const chartData = checkups.map((c) => ({
     ...c,
     label: fmtDate(c.tanggal),
@@ -136,12 +146,57 @@ export default function PatientDetail() {
         </div>
       </div>
 
+      {p.kupon_eligible && (
+        <div
+          data-testid="kupon-banner"
+          className={`flex flex-wrap items-center gap-3 mb-6 px-5 py-4 rounded-xl border ${
+            p.kupon_diklaim ? "bg-slate-50 border-slate-200" : "bg-emerald-50 border-emerald-200"
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${p.kupon_diklaim ? "bg-slate-200 text-slate-500" : "bg-emerald-600 text-white"}`}>
+            <Gift className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <div className="flex items-center gap-2">
+              <div className={`text-sm font-bold ${p.kupon_diklaim ? "text-slate-600" : "text-emerald-800"}`}>
+                Kupon Pijat Bayi Gratis 1x
+              </div>
+              {p.kupon_diklaim && (
+                <span data-testid="kupon-status-pill" className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold">
+                  Sudah Dipakai
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              {p.kupon_diklaim
+                ? "Kupon sudah ditandai terpakai."
+                : "Pasien berhak mendapat kupon karena kontrol kehamilan lebih dari 5 kali."}
+            </div>
+          </div>
+          <button
+            data-testid="kupon-claim-button"
+            onClick={toggleKupon}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+              p.kupon_diklaim
+                ? "border border-slate-300 text-slate-600 hover:bg-slate-100"
+                : "bg-emerald-600 text-white hover:bg-emerald-700"
+            }`}
+          >
+            <Check className="w-3.5 h-3.5" />
+            {p.kupon_diklaim ? "Batalkan Klaim" : "Tandai Sudah Dipakai"}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div className={cardCls}>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Data Pasien</h3>
           <div className="grid grid-cols-2 gap-4">
+            <InfoItem label="Usia" value={p.usia_tahun != null ? `${p.usia_tahun} tahun` : "-"} />
             <InfoItem label="No. WhatsApp" value={p.no_wa} />
             <InfoItem label="Alamat" value={p.alamat} />
+            <InfoItem label="Penyakit Penyerta" value={p.penyakit_penyerta} />
+            <InfoItem label="Keluhan Utama" value={p.keluhan_utama} />
             <InfoItem label="Riwayat" value={p.riwayat} />
             <InfoItem label="Catatan" value={p.catatan} />
           </div>

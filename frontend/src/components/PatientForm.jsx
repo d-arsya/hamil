@@ -7,10 +7,13 @@ const empty = {
   nama: "",
   no_wa: "",
   alamat: "",
+  tanggal_lahir: "",
   hpht: "",
   gravida: 1,
   para: 0,
   abortus: 0,
+  penyakit_penyerta: "",
+  keluhan_utama: "",
   riwayat: "",
   catatan: "",
 };
@@ -49,6 +52,7 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
     try {
       const payload = {
         ...form,
+        tanggal_lahir: form.tanggal_lahir || null,
         gravida: parseInt(form.gravida) || 1,
         para: parseInt(form.para) || 0,
         abortus: parseInt(form.abortus) || 0,
@@ -76,6 +80,17 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
         </Field>
         <Field label="Alamat">
           <textarea data-testid="patient-form-alamat" className={inputCls} rows={2} value={form.alamat} onChange={set("alamat")} placeholder="Alamat tempat tinggal" />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tanggal Lahir" hint="Usia dihitung otomatis">
+            <input data-testid="patient-form-tanggal-lahir" type="date" className={inputCls} value={form.tanggal_lahir || ""} onChange={set("tanggal_lahir")} />
+          </Field>
+          <Field label="Penyakit Penyerta" hint="cth: diabetes, hipertensi, asma">
+            <input data-testid="patient-form-penyakit-penyerta" className={inputCls} value={form.penyakit_penyerta} onChange={set("penyakit_penyerta")} placeholder="Tidak ada" />
+          </Field>
+        </div>
+        <Field label="Keluhan Utama">
+          <input data-testid="patient-form-keluhan-utama" className={inputCls} value={form.keluhan_utama} onChange={set("keluhan_utama")} placeholder="cth: mual berat, pusing, perdarahan" />
         </Field>
         <Field label="HPHT (Hari Pertama Haid Terakhir) *" hint="HPL & jadwal kontrol dihitung otomatis dari tanggal ini">
           <input data-testid="patient-form-hpht" type="date" className={inputCls} value={form.hpht} onChange={set("hpht")} />

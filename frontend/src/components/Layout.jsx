@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Menu, X, LogOut, HeartPulse } from "lucide-react";
+import { LayoutDashboard, Users, Menu, X, LogOut, HeartPulse, BookOpen } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
   { to: "/pasien", label: "Daftar Pasien", icon: Users, testid: "nav-pasien" },
+  { to: "/edukasi", label: "Edukasi", icon: BookOpen, testid: "nav-edukasi" },
 ];
 
 export default function Layout() {

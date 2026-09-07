@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration-3 tests for BidanKu new features: Kupon Pijat Bayi, identitas baru (tanggal_lahir/usia_tahun, penyakit_penyerta, keluhan_utama), and menu Edukasi. Backend: created /app/backend/tests/test_iteration3.py (10 tests) and re-ran full backend suite -> 54/54 PASS (100%) including 32 backend_test.py + 3 test_status_logic.py + 12 test_regression_iter2.py + 10 test_iteration3.py. Frontend (Playwright, 1440x900, real preview URL): login admin/admin123 OK; nav-edukasi renders /edukasi with all 5 tabs (trimester_1..4 + nifas) and counters, POST edukasi trimester_2 renders bubble with 'Bidan Admin · 7 Sep 2026', empty state visible on trimester_4, hover-reveal Trash2 delete + window.confirm accept removes the message (backend GET reflects removal). Patient create via form with all 3 new fields (tanggal-lahir, penyakit-penyerta, keluhan-utama) OK - detail page shows 'Usia 27 tahun', 'Penyakit Penyerta TEST diabetes', 'Keluhan Utama TEST mual berat'. Kupon banner absent at 0 and 5 ANC checkups, appears (emerald) at 6 ANC checkups, PUT /api/patients/{id}/kupon toggles banner text between '(Sudah Dipakai)' (grey) and un-claimed (emerald) via kupon-claim-button, and kupon-badge-{id} appears/disappears in patient list accordingly. Sanity: dashboard, add-patient modal, logout still work. All TEST_* patients and edukasi messages cleaned, login_attempts emptied.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/patients/{id}", "issue": "Still overwrites optional fields with defaults on partial payloads (unchanged from iter2). New fields tanggal_lahir/penyakit_penyerta/keluhan_utama are also vulnerable — a client omitting them will null/blank the record. Use exclude_unset or dedicated update model."},
+      {"endpoint": "GET /api/patients", "issue": "kupon_eligible/kupon_diklaim computed via extra find per patient (existing N+1 pattern); minor at current data size."},
+      {"endpoint": "compute_status.jumlah_kontrol", "issue": "Still counts all checkups (ANC+KF); combined with new kupon_eligible = anc_total > 5 (correctly phase-scoped), the two counters can diverge for post-partum patients — cosmetic (unchanged from iter2)."},
+      {"endpoint": "POST /api/edukasi/{fase}", "issue": "'oleh' field only stores nama-or-username string at write time; if the bidan later renames, old messages keep stale attribution. Consider storing user_id too."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Edukasi", "issues": ["Delete button is hidden until group-hover — invisible on touch devices; consider tap-to-reveal or a visible more-menu on mobile.", "Chat container fixed at height:60vh; on very short viewports empty state can be tight, but acceptable."]},
+      {"screen": "Patient Detail — banner", "issues": ["Button label 'Tandai Sudah Dipakai' literally contains the string 'Sudah Dipakai' that is also used as the claimed-state marker in the banner heading; only the parenthesised '(Sudah Dipakai)' next to the title reliably differentiates state. Consider a status pill instead of relying on parentheses."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_regression_iter2.py",
+    "/app/backend/tests/test_status_logic.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: switch PUT /api/patients to exclude_unset or a partial-update model so tanggal_lahir/penyakit_penyerta/keluhan_utama aren't wiped on partial edits.",
+    "Optional: replace banner heading '(Sudah Dipakai)' with a small status badge so state isn't inferred from parentheses that collide with the button label.",
+    "Optional: make the edukasi trash button visible on mobile (no group-hover) — currently only reachable via keyboard/hover on desktop."
+  ],
+  "critical_code_review_comments": [
+    "serialize_patient computes usia_tahun with the standard (today.year - lahir.year - ((month, day) < (lahir.month, lahir.day))) — correct across year boundaries.",
+    "kupon_eligible is derived on read (anc_total > 5), so it re-flips off if an ANC checkup is deleted below the threshold, which is the desired behaviour. UI banner + badge honour this via reload.",
+    "Edukasi endpoints validate fase against FASE_EDUKASI list and reject blank/whitespace-only isi with 400 — good. No MongoDB _id leaks (all list/find calls project {_id:0}).",
+    "PatientForm.jsx sends tanggal_lahir as null when empty — server accepts Optional[str]=None, so no 400 on omit. Good.",
+    "Edukasi.jsx: `TABS.find(([k]) => k === tab)[1]` in placeholder will crash if `tab` is ever an unknown value — currently unreachable but brittle; add a safe fallback."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3.py"
+  ],
+  "success_rate": {"backend": "100% (54/54 pytest)", "frontend": "100% (edukasi tabs/send/empty-state/delete, identitas baru, kupon 0/5/6-anc + claim/unclaim + list badge, sanity dashboard/logout)"},
+  "test_credentials": "admin / admin123 (verified; login_attempts cleared)",
+  "seed_data_creation": "Created and deleted TEST_UI Kupon patient (with 6 ANC checkups) via mixed UI+API. Created and deleted TEST_UI edukasi messages in trimester_2. All TEST_* rows removed from db.patients and db.edukasi after tests; db.login_attempts emptied.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/ -n 0 (or use pytest.ini default). New feature testids: nav-edukasi, edukasi-page, edukasi-tab-{trimester_1..4,nifas}, edukasi-input, edukasi-send-button, edukasi-message-list (parent), edukasi-message-{id} (bubble), edukasi-delete-{id} (hover), edukasi-empty-state; patient-form-tanggal-lahir, patient-form-penyakit-penyerta, patient-form-keluhan-utama; kupon-banner, kupon-claim-button, kupon-badge-{id}. IMPORTANT: `edukasi-message-list` is the container — when picking a bubble use `[data-testid^=\"edukasi-message-\"]:not([data-testid=\"edukasi-message-list\"])`. Banner text always contains the substring 'Sudah Dipakai' because the button label is 'Tandai Sudah Dipakai'; use '(Sudah Dipakai)' (with parens) to detect the claimed state. Login testids: login-username-input, login-password-input, login-submit-button. Delete flows use window.confirm — accept via `page.once('dialog', d.accept())`. DB left with the original 4 seed patients only; no TEST_* residue.",
+  "rca_of_the_issue": "No defects found. All 3 new features (kupon pijat bayi with anc_total>5 gating + claim toggle, identitas baru with server-computed usia_tahun, edukasi chatbox with 5 fase and CRUD) behave to spec on both API and UI. All prior regression checks (auth, dashboard, patients CRUD, checkups, persalinan, bcrypt, lockout, phase-scoped status) still pass."
+}

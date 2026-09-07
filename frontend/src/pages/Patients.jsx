@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, MessageCircle, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Search, MessageCircle, Pencil, Trash2, Eye, Gift } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";
 import StatusBadge, { FaseBadge } from "../components/StatusBadge";
@@ -131,10 +131,19 @@ export default function Patients() {
               {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/60 transition-colors" data-testid={`patient-row-${p.id}`}>
                   <td className="px-5 py-3.5">
-                    <Link to={`/pasien/${p.id}`} className="font-bold text-slate-900 hover:text-[#C02650] transition-colors">
-                      {p.nama}
-                    </Link>
-                    <div className="text-xs text-slate-400">G{p.gravida} P{p.para} A{p.abortus}</div>
+                    <div className="flex items-center gap-1.5">
+                      <Link to={`/pasien/${p.id}`} className="font-bold text-slate-900 hover:text-[#C02650] transition-colors">
+                        {p.nama}
+                      </Link>
+                      {p.kupon_eligible && !p.kupon_diklaim && (
+                        <span data-testid={`kupon-badge-${p.id}`} title="Berhak kupon pijat bayi gratis" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                          <Gift className="w-3 h-3" /> Kupon
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {p.usia_tahun != null ? `${p.usia_tahun} th · ` : ""}G{p.gravida} P{p.para} A{p.abortus}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5 text-slate-600 font-mono text-xs">{p.no_wa}</td>
                   <td className="px-5 py-3.5">

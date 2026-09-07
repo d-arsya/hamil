@@ -70,10 +70,14 @@ def parse_date(value: str, field: str) -> date:
         raise HTTPException(status_code=400, detail=f"Format {field} tidak valid (gunakan YYYY-MM-DD)")
 
 
-def validate_patient_dates(hpht: str):
+def validate_patient_dates(hpht: str, tanggal_lahir: Optional[str] = None):
     hpht_date = parse_date(hpht, "tanggal HPHT")
     if hpht_date > date.today():
         raise HTTPException(status_code=400, detail="Tanggal HPHT tidak boleh di masa depan")
+    if tanggal_lahir:
+        lahir = parse_date(tanggal_lahir, "tanggal lahir")
+        if lahir > date.today():
+            raise HTTPException(status_code=400, detail="Tanggal lahir tidak boleh di masa depan")
     return hpht_date
 
 
@@ -91,10 +95,13 @@ class PatientInput(BaseModel):
     nama: str
     no_wa: str
     alamat: Optional[str] = ""
+    tanggal_lahir: Optional[str] = None
     hpht: str
     gravida: int = 1
     para: int = 0
     abortus: int = 0
+    penyakit_penyerta: Optional[str] = ""
+    keluhan_utama: Optional[str] = ""
     riwayat: Optional[str] = ""
     catatan: Optional[str] = ""
 
@@ -180,18 +187,30 @@ def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -
 
 
 def serialize_patient(p: dict, checkups: list) -> dict:
+    usia_tahun = None
+    if p.get("tanggal_lahir"):
+        lahir = date.fromisoformat(p["tanggal_lahir"])
+        today = date.today()
+        usia_tahun = today.year - lahir.year - ((today.month, today.day) < (lahir.month, lahir.day))
+    anc_total = sum(1 for c in checkups if c.get("jenis") == "anc")
     return {
         "id": p["id"],
         "nama": p["nama"],
         "no_wa": p["no_wa"],
         "alamat": p.get("alamat", ""),
+        "tanggal_lahir": p.get("tanggal_lahir"),
+        "usia_tahun": usia_tahun,
         "hpht": p["hpht"],
         "gravida": p.get("gravida", 1),
         "para": p.get("para", 0),
         "abortus": p.get("abortus", 0),
+        "penyakit_penyerta": p.get("penyakit_penyerta", ""),
+        "keluhan_utama": p.get("keluhan_utama", ""),
         "riwayat": p.get("riwayat", ""),
         "catatan": p.get("catatan", ""),
         "tanggal_persalinan": p.get("tanggal_persalinan"),
+        "kupon_eligible": anc_total > 5,
+        "kupon_diklaim": p.get("kupon_diklaim", False),
         "created_at": p.get("created_at"),
         **compute_status(p, checkups),
     }
@@ -265,13 +284,14 @@ async def list_patients(user=Depends(get_current_user)):
 
 @api_router.post("/patients")
 async def create_patient(data: PatientInput, user=Depends(get_current_user)):
-    validate_patient_dates(data.hpht)
+    validate_patient_dates(data.hpht, data.tanggal_lahir)
     validate_gpa(data)
     doc = {
         "id": str(uuid.uuid4()),
         **data.model_dump(),
         "nama": data.nama.strip(),
         "tanggal_persalinan": None,
+        "kupon_diklaim": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.patients.insert_one(doc)
@@ -290,7 +310,7 @@ async def get_patient(patient_id: str, user=Depends(get_current_user)):
 
 @api_router.put("/patients/{patient_id}")
 async def update_patient(patient_id: str, data: PatientInput, user=Depends(get_current_user)):
-    validate_patient_dates(data.hpht)
+    validate_patient_dates(data.hpht, data.tanggal_lahir)
     validate_gpa(data)
     result = await db.patients.update_one({"id": patient_id}, {"$set": data.model_dump()})
     if result.matched_count == 0:
@@ -366,6 +386,66 @@ async def delete_checkup(checkup_id: str, user=Depends(get_current_user)):
 @api_router.get("/")
 async def root():
     return {"message": "BidanKu API"}
+
+
+# ---------- KUPON PIJAT BAYI ----------
+class KuponInput(BaseModel):
+    diklaim: bool
+
+
+@api_router.put("/patients/{patient_id}/kupon")
+async def set_kupon(patient_id: str, data: KuponInput, user=Depends(get_current_user)):
+    result = await db.patients.update_one({"id": patient_id}, {"$set": {"kupon_diklaim": data.diklaim}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    return await patient_with_checkups(p)
+
+
+# ---------- EDUKASI ----------
+FASE_EDUKASI = ["trimester_1", "trimester_2", "trimester_3", "trimester_4", "nifas"]
+
+
+class EdukasiInput(BaseModel):
+    isi: str
+
+
+@api_router.get("/edukasi")
+async def get_edukasi(user=Depends(get_current_user)):
+    msgs = await db.edukasi.find({}, {"_id": 0}).to_list(5000)
+    out = {f: [] for f in FASE_EDUKASI}
+    for m in msgs:
+        if m.get("fase") in out:
+            out[m["fase"]].append(m)
+    for f in out:
+        out[f].sort(key=lambda m: m["created_at"])
+    return out
+
+
+@api_router.post("/edukasi/{fase}")
+async def add_edukasi(fase: str, data: EdukasiInput, user=Depends(get_current_user)):
+    if fase not in FASE_EDUKASI:
+        raise HTTPException(status_code=400, detail="Fase edukasi tidak dikenal")
+    if not data.isi.strip():
+        raise HTTPException(status_code=400, detail="Isi edukasi tidak boleh kosong")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "fase": fase,
+        "isi": data.isi.strip(),
+        "oleh": user.get("nama") or user.get("username", ""),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.edukasi.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/edukasi/{msg_id}")
+async def delete_edukasi(msg_id: str, user=Depends(get_current_user)):
+    result = await db.edukasi.delete_one({"id": msg_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pesan edukasi tidak ditemukan")
+    return {"ok": True}
 
 
 app.include_router(api_router)
