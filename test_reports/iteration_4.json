@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration-4 verified the fix for 'Gagal menyimpan tanggal persalinan' toast. Backend PUT /api/patients/{id}/persalinan already returned proper Indonesian details (200 for valid, 400 'Tanggal persalinan tidak boleh sebelum HPHT' / 'Tanggal persalinan tidak boleh di masa depan'). Frontend fix in PatientDetail.jsx now surfaces those details via apiError() instead of the generic message, and the delivery-date-input has min={p.hpht} + max={today} + helper text 'Harus antara HPHT (...) dan hari ini...'. Added /app/backend/tests/test_persalinan_validation.py (4 tests: future, before-HPHT, valid->nifas, null-reset) — all pass. Full backend suite 58/58 PASS (32 backend_test + 3 test_status_logic + 12 test_regression_iter2 + 10 test_iteration3 + 4 new). Frontend UI test via Playwright on the preview URL: login admin/admin123 OK; opened Tandai Persalinan modal on a fresh TEST_UI_persalinan patient (HPHT 90 days ago); confirmed input min=2026-06-17, max=2026-09-15 (today), helper text present; submitted before-HPHT -> toast contained 'sebelum HPHT'; submitted future date -> toast contained 'masa depan'; submitted valid today's date -> success, GET /api/patients/{id} shows fase=nifas and tanggal_persalinan=today. Sanity: patient list renders, WA reminder modal opens. Test patient cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_persalinan_validation.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration3.py",
+    "/app/backend/tests/test_regression_iter2.py",
+    "/app/backend/tests/test_status_logic.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "apiError() in /app/frontend/src/lib/api.js correctly extracts FastAPI's detail (string or list-of-msgs) with a sensible fallback — reusable across the app.",
+    "delivery-date-input uses min={p.hpht} and max={new Date().toISOString().slice(0,10)}; note this is browser-local calendar-constrained only, backend still validates (defence in depth) — good.",
+    "Consider extending the same apiError() upgrade to toggleKupon()/deleteCheckup()/deletePatient() which still fall back to a generic 'Gagal ...' string on server errors."
+  ],
+  "updated_files": ["/app/backend/tests/test_persalinan_validation.py"],
+  "success_rate": {"backend": "100% (58/58 pytest)", "frontend": "100% (persalinan modal min/max/helper + real backend toast for before-HPHT & future + valid save moves to nifas; sanity patient list & WA modal)"},
+  "test_credentials": "admin / admin123 (verified)",
+  "seed_data_creation": "Created and deleted TEST_UI_persalinan patient (HPHT today-90d) via API. Also created & deleted TEST_persalinan_val patients inside pytest fixtures. No residual TEST_* data. login_attempts collection cleared.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fix verified end-to-end. Run all backend tests with: cd /app/backend && REACT_APP_BACKEND_URL=<preview_url> python -m pytest tests/ -n 0 (pytest.ini currently has addopts that require -n 0 override otherwise xdist runs). New test file /app/backend/tests/test_persalinan_validation.py is idempotent and self-cleans. Frontend testids in play: mark-delivery-button, delivery-date-input (with min/max attrs), delivery-submit-button. The date input is type='date' so use HTMLInputElement value setter + input/change event dispatch to bypass browser min/max UI clamp when negative-testing.",
+  "rca_of_the_issue": "Original user report ('kenapa gagal menyimpan tanggal persalinan') was NOT a backend defect. PUT /api/patients/{id}/persalinan always returned an Indonesian 400 detail for the two invalid ranges (< HPHT / > today), but the old PatientDetail.jsx swallowed err.response.data.detail and showed a generic 'Gagal menyimpan tanggal persalinan' toast, so the user could not tell why. The user's patient 'dava' had HPHT 2026-07-15 and was likely receiving 400 due to a date outside [HPHT, today]. Fix (main agent): (1) toast now uses apiError(err, fallback) which extracts detail; (2) date input has min=HPHT and max=today plus explicit helper text — preventing the invalid submission in the first place. Confirmed both paths (real backend detail toast for negative cases, valid save transitions fase to nifas) work on the live preview URL."
+}

@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import api from "../lib/api";
+import api, { apiError } from "../lib/api";
 import StatusBadge, { FaseBadge, RiskBadges, riskNameColor } from "../components/StatusBadge";
 import PatientForm from "../components/PatientForm";
 import CheckupForm from "../components/CheckupForm";
@@ -56,8 +56,8 @@ export default function PatientDetail() {
       toast.success("Persalinan dicatat — pasien masuk fase nifas");
       setDeliveryOpen(false);
       load();
-    } catch {
-      toast.error("Gagal menyimpan tanggal persalinan");
+    } catch (err) {
+      toast.error(apiError(err, "Gagal menyimpan tanggal persalinan"));
     }
   };
 
@@ -334,10 +334,15 @@ export default function PatientDetail() {
             <input
               data-testid="delivery-date-input"
               type="date"
+              min={p.hpht}
+              max={new Date().toISOString().slice(0, 10)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
             />
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              Harus antara HPHT ({fmtDate(p.hpht)}) dan hari ini. Jika tanggal lahir bayi sebenarnya sebelum HPHT, periksa kembali tanggal HPHT pasien lewat tombol Edit.
+            </p>
           </div>
           <button
             data-testid="delivery-submit-button"
