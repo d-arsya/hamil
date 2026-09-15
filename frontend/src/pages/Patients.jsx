@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, Search, MessageCircle, Pencil, Trash2, Eye, Gift } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";
-import StatusBadge, { FaseBadge } from "../components/StatusBadge";
+import StatusBadge, { FaseBadge, RiskBadges, riskNameColor } from "../components/StatusBadge";
 import PatientForm from "../components/PatientForm";
 import WaReminder from "../components/WaReminder";
 import { useAuth } from "../context/AuthContext";
@@ -131,8 +131,11 @@ export default function Patients() {
               {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/60 transition-colors" data-testid={`patient-row-${p.id}`}>
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-1.5">
-                      <Link to={`/pasien/${p.id}`} className="font-bold text-slate-900 hover:text-[#C02650] transition-colors">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Link
+                        to={`/pasien/${p.id}`}
+                        className={`font-bold hover:underline transition-colors ${riskNameColor(p.penyakit_penyerta) || "text-slate-900 hover:text-[#C02650]"}`}
+                      >
                         {p.nama}
                       </Link>
                       {p.kupon_eligible && !p.kupon_diklaim && (
@@ -141,7 +144,10 @@ export default function Patients() {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <RiskBadges penyakit={p.penyakit_penyerta} testidPrefix={`risk-${p.id}`} />
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
                       {p.usia_tahun != null ? `${p.usia_tahun} th · ` : ""}G{p.gravida} P{p.para} A{p.abortus}
                     </div>
                   </td>

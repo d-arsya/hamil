@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, CalendarClock, AlertTriangle, Baby, MessageCircle, ArrowRight, UserPlus } from "lucide-react";
 import api from "../lib/api";
-import StatusBadge, { FaseBadge } from "../components/StatusBadge";
+import StatusBadge, { FaseBadge, RiskBadges, riskNameColor } from "../components/StatusBadge";
 import WaReminder from "../components/WaReminder";
 import PatientForm from "../components/PatientForm";
 import { useAuth } from "../context/AuthContext";
@@ -81,9 +81,12 @@ export default function Dashboard() {
             {perlu_tindakan.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-4 hover:bg-slate-50/60 transition-colors" data-testid={`dashboard-row-${p.id}`}>
                 <div className="flex-1 min-w-[160px]">
-                  <Link to={`/pasien/${p.id}`} className="text-sm font-bold text-slate-900 hover:text-[#C02650] transition-colors">
+                  <Link to={`/pasien/${p.id}`} className={`text-sm font-bold hover:underline transition-colors ${riskNameColor(p.penyakit_penyerta) || "text-slate-900 hover:text-[#C02650]"}`}>
                     {p.nama}
                   </Link>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    <RiskBadges penyakit={p.penyakit_penyerta} testidPrefix={`risk-dash-${p.id}`} />
+                  </div>
                   <div className="text-xs text-slate-500 mt-0.5">{usiaLabel(p)} · {p.kunjungan_berikutnya ? `Kunjungan ${p.kunjungan_berikutnya}` : "Selesai"}</div>
                 </div>
                 <div className="hidden sm:block">

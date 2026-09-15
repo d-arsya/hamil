@@ -6,7 +6,7 @@ import {
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import api from "../lib/api";
-import StatusBadge, { FaseBadge } from "../components/StatusBadge";
+import StatusBadge, { FaseBadge, RiskBadges, riskNameColor } from "../components/StatusBadge";
 import PatientForm from "../components/PatientForm";
 import CheckupForm from "../components/CheckupForm";
 import WaReminder from "../components/WaReminder";
@@ -99,9 +99,10 @@ export default function PatientDetail() {
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
           <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900" data-testid="patient-name">{p.nama}</h1>
+            <h1 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${riskNameColor(p.penyakit_penyerta) || "text-slate-900"}`} data-testid="patient-name">{p.nama}</h1>
             <FaseBadge fase={p.fase} />
             <StatusBadge status={p.status} />
+            <RiskBadges penyakit={p.penyakit_penyerta} testidPrefix="risk-detail" />
           </div>
           <p className="text-sm text-slate-500">{usiaLabel(p)} · G{p.gravida} P{p.para} A{p.abortus}</p>
         </div>
@@ -263,8 +264,12 @@ export default function PatientDetail() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200/80 overflow-x-auto">
-        <div className="px-5 py-4 border-b border-slate-100">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-2.5">
           <h2 className="text-base font-bold text-slate-900">Riwayat Kontrol</h2>
+          <RiskBadges penyakit={p.penyakit_penyerta} testidPrefix="risk-riwayat" />
+          {riskNameColor(p.penyakit_penyerta) && (
+            <span className="text-[11px] text-slate-400">— pasien risiko, tandai saat pemeriksaan</span>
+          )}
         </div>
         {checkups.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-slate-400" data-testid="checkups-empty-state">
