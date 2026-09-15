@@ -36,6 +36,13 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 ## Iterasi 3 (Sept 2026)
 - Kirim Edukasi ke WA: tombol "Kirim ke WA Pasien" di tiap tab edukasi — modal menyiapkan pesan gabungan dari chatbox fase tsb (bisa diedit/disalin) + daftar pasien penerima otomatis sesuai fase (T1/T2/T3 → fase trimester terkait, Masa Nifas → nifas ≤42 hari, Trimester 4 → nifas >42 hari), tinggal klik "Kirim WA" per pasien (wa.me pre-filled). Komponen: EdukasiBlast.jsx.
 
+## Iterasi 4 (Sept 2026)
+- Penanda risiko berwarna dari penyakit penyerta: merah = hipertensi/preeklamsia, kuning = diabetes melitus, biru = penyakit lain; tampil di daftar pasien, dashboard, header detail, dan kartu Riwayat Kontrol (StatusBadge.jsx: riskFlags/RiskBadges/riskNameColor)
+- Bug fix: toast gagal simpan tanggal persalinan kini menampilkan alasan asli backend + date picker dibatasi min=HPHT, max=hari ini (testing iterasi 4: 58/58 pass)
+
+## Iterasi 5 (Sept 2026)
+- Pembungkus desktop Windows: /app/electron (Electron + electron-builder NSIS) + GitHub Actions workflow /.github/workflows/build-windows.yml untuk build .exe otomatis di cloud. URL aplikasi diatur via electron/config.json.
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)
