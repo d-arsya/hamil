@@ -591,7 +591,15 @@ PENYULIT_DEFAULT = {"Tidak ada", "Preeklamsia", "Eklampsia", "Vasa previa", "Gan
 @api_router.get("/options/penyulit")
 async def get_penyulit_options(user=Depends(get_current_user)):
     vals = await db.patients.distinct("riwayat_kehamilan.penyulit")
-    custom = sorted({v.strip() for v in vals if v and v.strip() and v.strip() not in PENYULIT_DEFAULT})
+    default_lower = {d.lower() for d in PENYULIT_DEFAULT}
+    seen = set()
+    custom = []
+    for v in sorted({v.strip() for v in vals if v and v.strip()}):
+        low = v.lower()
+        if low in default_lower or low in seen:
+            continue
+        seen.add(low)
+        custom.append(v)
     return {"custom": custom}
 
 
@@ -610,6 +618,11 @@ async def get_templates(user=Depends(get_current_user)):
 async def add_template(data: TemplateInput, user=Depends(get_current_user)):
     if not data.judul.strip() or not data.isi.strip():
         raise HTTPException(status_code=400, detail="Judul dan isi template wajib diisi")
+    if len(data.judul) > 200 or len(data.isi) > 5000:
+        raise HTTPException(status_code=400, detail="Judul maksimal 200 karakter, isi maksimal 5000 karakter")
+    dup = await db.templates.find_one({"judul": data.judul.strip()})
+    if dup:
+        raise HTTPException(status_code=400, detail="Template dengan judul ini sudah ada")
     doc = {
         "id": str(uuid.uuid4()),
         "judul": data.judul.strip(),

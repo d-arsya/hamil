@@ -38,6 +38,7 @@ export default function PatientDetail() {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const emptyDelivery = { tanggal: "", nama_anak: "", jenis_kelamin_anak: "", cara_lahir: "", tempat_lahir: "", penolong_persalinan: "", masalah_persalinan: "" };
   const [deliveryData, setDeliveryData] = useState(emptyDelivery);
+  const [deliverySaving, setDeliverySaving] = useState(false);
   const [waTemplate, setWaTemplate] = useState(null);
 
   const load = () => api.get(`/patients/${id}`).then((r) => setData(r.data)).catch(() => navigate("/pasien"));
@@ -55,6 +56,7 @@ export default function PatientDetail() {
       toast.error("Pilih tanggal persalinan");
       return;
     }
+    setDeliverySaving(true);
     try {
       await api.put(`/patients/${p.id}/persalinan`, {
         tanggal_persalinan: deliveryData.tanggal,
@@ -65,11 +67,13 @@ export default function PatientDetail() {
         penolong_persalinan: deliveryData.penolong_persalinan,
         masalah_persalinan: deliveryData.masalah_persalinan,
       });
-      toast.success("Persalinan dicatat — pasien masuk fase nifas");
+      toast.success(p.tanggal_persalinan ? "Data persalinan diperbarui" : "Persalinan dicatat — pasien masuk fase nifas");
       setDeliveryOpen(false);
       load();
     } catch (err) {
       toast.error(apiError(err, "Gagal menyimpan tanggal persalinan"));
+    } finally {
+      setDeliverySaving(false);
     }
   };
 
@@ -506,9 +510,10 @@ export default function PatientDetail() {
           <button
             data-testid="delivery-submit-button"
             onClick={saveDelivery}
-            className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+            disabled={deliverySaving}
+            className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-colors disabled:opacity-60"
           >
-            {p.tanggal_persalinan ? "Simpan Perubahan" : "Simpan — Masuk Fase Nifas"}
+            {deliverySaving ? "Menyimpan..." : p.tanggal_persalinan ? "Simpan Perubahan" : "Simpan — Masuk Fase Nifas"}
           </button>
         </div>
       </Modal>

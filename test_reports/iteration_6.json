@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration-6 verified 6 new bidan features on BidanKu (penyulit custom + Lainnya, cara_lahir riwayat, checkup jenis override ANC/PNC, edit persalinan on nifas, WA custom template CRUD + placeholders, no numeric prefix in edukasi blast). Added /app/backend/tests/test_iteration6.py (8 tests, all pass). Full backend suite 80/80 PASS on preview URL (72 prior + 8 new, pytest -n 0, ~77s). Frontend Playwright on preview URL: LOGIN admin/admin123 OK; PatientForm — riwayat-add-button spawns row 0 with riwayat-penyulit-0 (default 8 opts), selecting 'Lainnya' reveals riwayat-penyulit-custom-0 input, saving TEST patient with custom value 'TEST_ITER6_UI_PlacentaAkreta' + riwayat-cara-lahir-0='Normal - Vakum/Forceps' persists via POST /api/patients; reopening add form shows custom penyulit as new option in dropdown (verified via GET /api/options/penyulit). PatientDetail riwayat-item-0 displays 'Normal - Vakum/Forceps' and red 'penyulit: TEST_ITER6_UI_PlacentaAkreta'. CheckupForm — checkup-form-jenis dropdown has 2 opts (anc, kf), default 'anc' for hamil, switching to 'kf' reveals checkup-nifas-section immediately. WaReminder — wa-message-textarea filled with '{nama} ... {jadwal}', wa-template-judul='TEST_ITER6_TPL' + wa-template-save creates POST /api/templates and appends a new tab with the judul; clicking the tab loads pesan with {nama}=>'TEST_ITER6_UIPatient' and {jadwal}=>'16 Okt 2026' (placeholders auto-replaced); wa-template-delete removes the tab and DELETE /api/templates/{id} returns 200. Edukasi blast — Trimester 2 (2 materials) & Masa Nifas (3 materials) modals load textarea joined with '\\n\\n' separators and NO '1.' '2.' '3.' prefixes. PatientDetail 'Dewi Lestari' (fase=nifas, non-TEST) shows edit-delivery-button opening modal titled 'Edit Data Persalinan & Bayi' with delivery-date-input prefilled '2026-09-15', submit btn 'Simpan Perubahan' — no 'saving is not defined' runtime error observed (fix confirmed). All previous iteration-1..5 flows (login, daftar pasien filter-legend, timeline, imunisasi panel, WA default 5 tabs, kupon) still work; no regressions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration6.py",
+    "/app/backend/tests/test_iteration5.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration3.py",
+    "/app/backend/tests/test_regression_iter2.py",
+    "/app/backend/tests/test_status_logic.py",
+    "/app/backend/tests/test_persalinan_validation.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now ~732 lines (over 700-line threshold) — split into routers/patients.py, routers/checkups.py, routers/imunisasi.py, routers/templates.py, services/status.py, services/timeline.py.",
+    "GET /api/options/penyulit does distinct on riwayat_kehamilan.penyulit but does NOT trim/normalise case — 'Preeklamsia ' with trailing space or lowercase 'preeklamsia' will leak as a 'custom' option next to the default (minor UX bug; the .strip() in the endpoint helps for whitespace but not for case).",
+    "TemplateInput has no max length or content validation — a malicious client could POST a 10MB template. Add Field(max_length=200) for judul and Field(max_length=5000) for isi.",
+    "customTemplates list is not deduplicated by judul — bidan can save two templates with identical judul which then render as two identically-labelled tabs (backend allows duplicates). Consider adding unique index on (judul) OR client-side de-dup.",
+    "WaReminder.applyPlaceholders uses replaceAll which requires modern browsers; existing components use .replaceAll heavily, but a String.prototype.replaceAll polyfill fallback would be safer for older Android WebView.",
+    "PatientDetail.jsx delivery modal now handles both create & edit paths but does not disable the submit button while awaiting the API call — a fast double-click could send two PUT /persalinan requests; add local isSaving state on that modal too (the ancillary 'saving is not defined' bug fix removed the disabled state)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration6.py", "/app/test_reports/iteration_6.json", "/app/test_reports/pytest/pytest_results.xml"],
+  "success_rate": {"backend": "100% (80/80 pytest, 8 new iter6 + 72 regression)", "frontend": "100% on preview URL — custom penyulit + cara_lahir persistence & re-appear as option, checkup jenis dropdown + PNC section toggle, WA custom template save+placeholders+delete, edit-persalinan modal renders with prefill, edukasi blast without numeric prefix, no runtime errors"},
+  "test_credentials": "admin / admin123 (verified)",
+  "seed_data_creation": "TEST_ITER6_* patients and TEST_ITER6_TPL* templates created during backend pytest are cleaned up by fixture teardown. UI-created TEST_ITER6_UIPatient + TEST_ITER6_TPL were deleted via UI/API at end of script. Verified 0 residual TEST_* records via GET /api/patients and GET /api/templates. login_attempts collection: not touched (no lockout tests run).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run backend regression: cd /app/backend && REACT_APP_BACKEND_URL=<preview> python -m pytest tests/ -q -n 0 (80 tests, ~77s). Iter6 testids added: riwayat-penyulit-custom-{i}, riwayat-cara-lahir-{i}, checkup-form-jenis, checkup-nifas-section, edit-delivery-button, wa-template-judul, wa-template-save, wa-template-delete, wa-template-custom:{id}. New backend endpoints exercised: GET /api/options/penyulit (returns {custom: [str]}), POST/GET/DELETE /api/templates ({id, judul, isi, oleh, created_at}), checkup POST now accepts 'jenis' override ('anc'|'kf'). Preview URL: https://antenatal-postnatal.preview.emergentagent.com. Login flow uses data-testid login-username-input / login-password-input / login-submit-button (NOT login-username/login-password). After lockout testing: mongosh test_database --eval 'db.login_attempts.deleteMany({})'.",
+  "rca_of_the_issue": "N/A — this iteration validated 6 new features. The recent 'saving is not defined' runtime fix in PatientDetail.jsx delivery modal was verified: opening edit-delivery-button on Dewi Lestari (nifas) rendered the modal with all fields prefilled and correct title 'Edit Data Persalinan & Bayi' + submit label 'Simpan Perubahan' without any console/page errors."
+}

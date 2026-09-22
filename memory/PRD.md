@@ -60,8 +60,9 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 2. Riwayat kehamilan: tambah pilihan cara lahir (Normal-Spontan / Normal-Vakum/Forceps / Sesar), tampil di profil pasien
 3. Catat kontrol: pilihan jenis kunjungan ANC (antenatal) / PNC (postnatal) via select checkup-form-jenis; backend menerima override jenis; section KB/imunisasi mengikuti PNC
 4. Edit data persalinan & bayi (nama anak, JK, cara lahir, tempat, penolong, masalah) lewat tombol "Edit Persalinan" pada pasien nifas
-5. Template WA custom: judul + isi bisa disimpan (POST /api/templates) dan dipakai ulang; placeholder {nama} {anak} {jadwal} otomatis diganti data pasien; bisa dihapus
+5. Template WA custom: judul + isi bisa disimpan (POST /api/templates) dan dipakai ulang; placeholder {nama} {anak} {jadwal} otomatis diganti data pasien; bisa dihapus; validasi panjang & judul duplikat
 6. Blast edukasi: nomor urut "1. 2." dihapus — pesan gabungan langsung isi materi
+- Hardening: dedup penyulit case-insensitive, guard double-submit modal persalinan (testing iterasi 6: 80/80 pass)
 
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
