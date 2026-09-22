@@ -64,6 +64,12 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 6. Blast edukasi: nomor urut "1. 2." dihapus — pesan gabungan langsung isi materi
 - Hardening: dedup penyulit case-insensitive, guard double-submit modal persalinan (testing iterasi 6: 80/80 pass)
 
+## Iterasi 7 (Sept 2026) — 4 penyempurnaan
+1. Catat kontrol: pilihan detail kunjungan K1-K6 (ANC) / KF1-KF4 (PNC) via checkup-form-ke; compute_status & timeline berbasis nomor ke (bukan urutan); duplikat nomor kunjungan ditolak 400
+2. Modal Kirim Edukasi WA: bisa muat & simpan template custom (dropdown blast-template-select + blast-template-save), placeholder {nama}/{anak}/{jadwal} dipersonalisasi per pasien saat kirim
+3. Template WA tersinkron satu koleksi /api/templates — dipakai modal WA pasien & modal edukasi
+4. Menu Laporan baru (/laporan): ketuntasan per K1-K6 & KF1-KF4 (bar %), tuntas vs lost to follow up, persentase penyakit penyerta & penyulit tertinggi — endpoint GET /api/laporan
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

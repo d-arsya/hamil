@@ -23,7 +23,10 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setForm({ ...empty, tanggal: today, jenis: patient?.fase === "nifas" ? "kf" : "anc" });
+    if (open) {
+      const m = /(\d+)/.exec(patient?.kunjungan_berikutnya || "");
+      setForm({ ...empty, tanggal: today, jenis: patient?.fase === "nifas" ? "kf" : "anc", ke: m ? String(Number(m[1])) : "1" });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -45,6 +48,7 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
         catatan: form.catatan,
         rencana_tindak_lanjut: form.rencana_tindak_lanjut,
         jenis: form.jenis,
+        ke: parseInt(form.ke) || null,
         jenis_kb: form.jenis === "kf" ? form.jenis_kb : "",
         kontrol_kb: form.jenis === "kf" ? form.kontrol_kb : false,
         imunisasi_diberikan: form.jenis === "kf" ? form.imunisasi_diberikan : "",
@@ -70,6 +74,13 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
         <p className="text-[11px] text-slate-400 mt-1">Pilih PNC jika kunjungan ini untuk nifas meskipun pasien belum ditandai persalinan, atau sebaliknya.</p>
       </div>
       <form onSubmit={submit} className="space-y-4">
+        <Field label={`Kunjungan ${form.jenis === "kf" ? "PNC" : "ANC"} ke-`}>
+          <select data-testid="checkup-form-ke" className={inputCls} value={form.ke} onChange={set("ke")}>
+            {(form.jenis === "kf" ? [1, 2, 3, 4] : [1, 2, 3, 4, 5, 6]).map((n) => (
+              <option key={n} value={n}>{form.jenis === "kf" ? `KF${n} (hari ke-${[2, 7, 14, 42][n - 1]})` : `K${n} (mgg ke-${[12, 16, 26, 32, 36, 39][n - 1]})`}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="Tanggal Kontrol">
           <input data-testid="checkup-form-tanggal" type="date" className={inputCls} value={form.tanggal} onChange={set("tanggal")} />
         </Field>

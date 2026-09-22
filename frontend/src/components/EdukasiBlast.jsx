@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, MessageCircle, Users } from "lucide-react";
+import { Copy, Check, MessageCircle, Users, Save } from "lucide-react";
 import { toast } from "sonner";
 import Modal from "./Modal";
 import api from "../lib/api";
-import { waUrl, usiaLabel } from "../lib/utils-id";
+import { waUrl, usiaLabel, fmtDate } from "../lib/utils-id";
 import { FaseBadge } from "./StatusBadge";
 
 export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages }) {
@@ -11,13 +11,17 @@ export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages 
   const [text, setText] = useState("");
   const [selected, setSelected] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState([]);
+  const [saveJudul, setSaveJudul] = useState("");
 
   useEffect(() => {
     if (open) {
       setPatients(null);
       api.get("/patients").then((r) => setPatients(r.data));
+      api.get("/templates").then((r) => setCustomTemplates(r.data)).catch(() => {});
       setSelected(messages.map((m) => m.id));
       setCopied(false);
+      setSaveJudul("");
     }
   }, [open, fase, messages]);
 
@@ -51,17 +55,63 @@ export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages 
     }
   };
 
+  const personalize = (text, p) =>
+    text
+      .replaceAll("{nama}", p.nama)
+      .replaceAll("{anak}", p.nama_anak || `anak dari Ibu ${p.nama}`)
+      .replaceAll("{jadwal}", fmtDate(p.jadwal_berikutnya));
+
   const kirim = (p) => {
     if (!text.trim()) {
       toast.error("Isi pesan masih kosong");
       return;
     }
-    window.open(waUrl(p.no_wa, text), "_blank", "noopener,noreferrer");
+    window.open(waUrl(p.no_wa, personalize(text, p)), "_blank", "noopener,noreferrer");
+  };
+
+  const loadTemplate = (id) => {
+    const t = customTemplates.find((x) => x.id === id);
+    if (t) {
+      setText(t.isi);
+      toast.success(`Template "${t.judul}" dimuat`);
+    }
+  };
+
+  const saveTemplate = async () => {
+    if (!saveJudul.trim() || !text.trim()) {
+      toast.error("Isi judul dan pesan dulu");
+      return;
+    }
+    try {
+      await api.post("/templates", { judul: saveJudul.trim(), isi: text });
+      toast.success("Template tersimpan — juga muncul di modal WA pasien");
+      setSaveJudul("");
+      const r = await api.get("/templates");
+      setCustomTemplates(r.data);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Gagal menyimpan template");
+    }
   };
 
   return (
     <Modal open={open} onClose={onClose} title={`Kirim Edukasi ${faseLabel} ke WhatsApp`} testid="edukasi-blast-modal">
       <div className="space-y-4">
+        {customTemplates.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-600 whitespace-nowrap">Muat template:</label>
+            <select
+              data-testid="blast-template-select"
+              className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650]"
+              value=""
+              onChange={(e) => e.target.value && loadTemplate(e.target.value)}
+            >
+              <option value="">Pilih template tersimpan...</option>
+              {customTemplates.map((t) => (
+                <option key={t.id} value={t.id}>{t.judul}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="border border-slate-200 rounded-xl p-3 max-h-44 overflow-y-auto">
           <div className="text-xs font-semibold text-slate-600 mb-2">
             Pilih materi yang akan dikirim ({selected.length}/{messages.length})
@@ -106,6 +156,24 @@ export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages 
           />
         </div>
 
+        <div className="flex gap-2">
+          <input
+            data-testid="blast-template-judul"
+            className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
+            placeholder="Judul template untuk disimpan (dipakai ulang di sini & modal WA pasien)"
+            value={saveJudul}
+            onChange={(e) => setSaveJudul(e.target.value)}
+          />
+          <button
+            data-testid="blast-template-save"
+            onClick={saveTemplate}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Simpan Template
+          </button>
+        </div>
+        <p className="text-[11px] text-slate-400 -mt-1">Placeholder {"{nama}"}, {"{anak}"}, {"{jadwal}"} otomatis diganti data tiap pasien saat dikirim.</p>
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-4 h-4 text-slate-400" />

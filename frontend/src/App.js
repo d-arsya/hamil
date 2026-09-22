@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
 import PatientDetail from "./pages/PatientDetail";
 import Edukasi from "./pages/Edukasi";
+import Laporan from "./pages/Laporan";
 
 function Protected() {
   const { user, loading } = useAuth();
@@ -33,6 +34,7 @@ function App() {
             <Route path="/pasien" element={<Patients />} />
             <Route path="/pasien/:id" element={<PatientDetail />} />
             <Route path="/edukasi" element={<Edukasi />} />
+            <Route path="/laporan" element={<Laporan />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 import os
+import re
 import logging
 import uuid
 from datetime import datetime, timezone, date, timedelta
@@ -130,6 +131,7 @@ class CheckupInput(BaseModel):
     kontrol_kb: Optional[bool] = False
     imunisasi_diberikan: Optional[str] = ""
     jenis: Optional[str] = None
+    ke: Optional[int] = None
 
 
 class DeliveryInput(BaseModel):
@@ -178,39 +180,40 @@ def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -
         fase = "nifas"
         phase_checks = [c for c in checkups if c.get("jenis") == "kf"]
         hari_nifas = (today - persalinan).days
-        done = len(phase_checks)
-        if done >= len(KF_DAYS):
+        done_set = {c.get("ke") for c in phase_checks if c.get("ke")}
+        next_idx = next((i for i in range(len(KF_DAYS)) if (i + 1) not in done_set), None)
+        if next_idx is None:
             next_date, prev_date, kunjungan = None, persalinan + timedelta(days=KF_DAYS[-1]), None
         else:
-            next_date = persalinan + timedelta(days=KF_DAYS[done])
-            prev_date = persalinan + timedelta(days=KF_DAYS[done - 1]) if done > 0 else persalinan
-            kunjungan = f"KF{done + 1}"
+            next_date = persalinan + timedelta(days=KF_DAYS[next_idx])
+            prev_date = persalinan + timedelta(days=KF_DAYS[next_idx - 1]) if next_idx > 0 else persalinan
+            kunjungan = f"KF{next_idx + 1}"
     else:
         selisih = (today - hpht).days
         usia_minggu = selisih // 7
         usia_hari = selisih % 7
         fase = "trimester_1" if usia_minggu < 13 else ("trimester_2" if usia_minggu < 28 else "trimester_3")
         phase_checks = [c for c in checkups if c.get("jenis") == "anc"]
-        done = len(phase_checks)
-        if done >= len(ANC_WEEKS):
+        done_set = {c.get("ke") for c in phase_checks if c.get("ke")}
+        next_idx = next((i for i in range(len(ANC_WEEKS)) if (i + 1) not in done_set), None)
+        if next_idx is None:
             next_date, prev_date, kunjungan = None, hpht + timedelta(weeks=ANC_WEEKS[-1]), None
         else:
-            next_date = hpht + timedelta(weeks=ANC_WEEKS[done])
-            prev_date = hpht + timedelta(weeks=ANC_WEEKS[done - 1]) if done > 0 else None
-            kunjungan = f"K{done + 1}"
+            next_date = hpht + timedelta(weeks=ANC_WEEKS[next_idx])
+            prev_date = hpht + timedelta(weeks=ANC_WEEKS[next_idx - 1]) if next_idx > 0 else None
+            kunjungan = f"K{next_idx + 1}"
 
     last = max((date.fromisoformat(c["tanggal"]) for c in phase_checks), default=None)
 
     if persalinan:
-        fase_ke, fase_total = min(done, len(KF_DAYS)), len(KF_DAYS)
+        fase_ke, fase_total = min(len(done_set), len(KF_DAYS)), len(KF_DAYS)
     else:
         if fase == "trimester_1":
-            fase_total, offset = 2, 0
+            fase_ke, fase_total = len(done_set & {1, 2}), 2
         elif fase == "trimester_2":
-            fase_total, offset = 1, 2
+            fase_ke, fase_total = len(done_set & {3}), 1
         else:
-            fase_total, offset = 3, 3
-        fase_ke = min(max(done - offset, 0), fase_total)
+            fase_ke, fase_total = len(done_set & {4, 5, 6}), 3
     selisih_hari = (next_date - today).days if next_date else None
 
     if next_date is None:
@@ -248,10 +251,12 @@ def build_timeline(p: dict, checkups: list) -> dict:
     hpht = date.fromisoformat(p["hpht"])
     anc = sorted([c for c in checkups if c.get("jenis") == "anc"], key=lambda c: c["tanggal"])
     kf = sorted([c for c in checkups if c.get("jenis") == "kf"], key=lambda c: c["tanggal"])
+    anc_by_ke = {c.get("ke"): c for c in anc}
+    kf_by_ke = {c.get("ke"): c for c in kf}
     fase_of_idx = {0: "trimester_1", 1: "trimester_1", 2: "trimester_2", 3: "trimester_3", 4: "trimester_3", 5: "trimester_3"}
     items = []
     for i, w in enumerate(ANC_WEEKS):
-        done = anc[i] if i < len(anc) else None
+        done = anc_by_ke.get(i + 1)
         items.append({
             "kode": f"K{i + 1}", "fase": fase_of_idx[i], "minggu": w, "hari": None,
             "target": (hpht + timedelta(weeks=w)).isoformat(),
@@ -261,7 +266,7 @@ def build_timeline(p: dict, checkups: list) -> dict:
     persalinan = date.fromisoformat(p["tanggal_persalinan"]) if p.get("tanggal_persalinan") else None
     if persalinan:
         for i, d in enumerate(KF_DAYS):
-            done = kf[i] if i < len(kf) else None
+            done = kf_by_ke.get(i + 1)
             items.append({
                 "kode": f"KF{i + 1}", "fase": "nifas", "minggu": None, "hari": d,
                 "target": (persalinan + timedelta(days=d)).isoformat(),
@@ -476,7 +481,16 @@ async def add_checkup(patient_id: str, data: CheckupInput, user=Depends(get_curr
     if not p:
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
     jenis = data.jenis if data.jenis in ("anc", "kf") else ("kf" if p.get("tanggal_persalinan") else "anc")
-    count = await db.checkups.count_documents({"patient_id": patient_id, "jenis": jenis})
+    max_ke = len(KF_DAYS) if jenis == "kf" else len(ANC_WEEKS)
+    if data.ke is not None:
+        if not (1 <= data.ke <= max_ke):
+            raise HTTPException(status_code=400, detail=f"Nomor kunjungan harus antara 1 dan {max_ke}")
+        dup = await db.checkups.find_one({"patient_id": patient_id, "jenis": jenis, "ke": data.ke})
+        if dup:
+            raise HTTPException(status_code=400, detail=f"Kunjungan {'KF' if jenis == 'kf' else 'K'}{data.ke} sudah pernah dicatat")
+        count = data.ke - 1
+    else:
+        count = await db.checkups.count_documents({"patient_id": patient_id, "jenis": jenis})
     tanggal = data.tanggal or date.today().isoformat()
     if parse_date(tanggal, "tanggal kontrol") > date.today():
         raise HTTPException(status_code=400, detail="Tanggal kontrol tidak boleh di masa depan")
@@ -641,6 +655,105 @@ async def delete_template(template_id: str, user=Depends(get_current_user)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Template tidak ditemukan")
     return {"ok": True}
+
+
+# ---------- LAPORAN ----------
+@api_router.get("/laporan")
+async def laporan(user=Depends(get_current_user)):
+    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
+    checks = await db.checkups.find({}, {"_id": 0}).to_list(50000)
+    by_patient = {}
+    for c in checks:
+        by_patient.setdefault(c["patient_id"], []).append(c)
+    today = date.today()
+
+    def done_ke(pid, jenis, ke):
+        return any(c.get("jenis") == jenis and c.get("ke") == ke for c in by_patient.get(pid, []))
+
+    anc_stats = []
+    for i, w in enumerate(ANC_WEEKS):
+        eligible = done = 0
+        for p in patients:
+            target = date.fromisoformat(p["hpht"]) + timedelta(weeks=w)
+            if target <= today or p.get("tanggal_persalinan"):
+                eligible += 1
+                if done_ke(p["id"], "anc", i + 1):
+                    done += 1
+        anc_stats.append({"kode": f"K{i + 1}", "label": f"K{i + 1} (mgg {w})", "eligible": eligible, "done": done, "persen": round(done / eligible * 100) if eligible else None})
+
+    kf_stats = []
+    for i, d in enumerate(KF_DAYS):
+        eligible = done = 0
+        for p in patients:
+            if not p.get("tanggal_persalinan"):
+                continue
+            if date.fromisoformat(p["tanggal_persalinan"]) + timedelta(days=d) <= today:
+                eligible += 1
+                if done_ke(p["id"], "kf", i + 1):
+                    done += 1
+        kf_stats.append({"kode": f"KF{i + 1}", "label": f"KF{i + 1} (hari {d})", "eligible": eligible, "done": done, "persen": round(done / eligible * 100) if eligible else None})
+
+    tuntas = lost = 0
+    for p in patients:
+        st = compute_status(p, by_patient.get(p["id"], []), today)
+        if st["status"] == "terlambat":
+            lost += 1
+            continue
+        due_ok = True
+        hpht = date.fromisoformat(p["hpht"])
+        if not p.get("tanggal_persalinan"):
+            for i, w in enumerate(ANC_WEEKS):
+                if hpht + timedelta(weeks=w) <= today and not done_ke(p["id"], "anc", i + 1):
+                    due_ok = False
+                    break
+        else:
+            pers = date.fromisoformat(p["tanggal_persalinan"])
+            for i, d in enumerate(KF_DAYS):
+                if pers + timedelta(days=d) <= today and not done_ke(p["id"], "kf", i + 1):
+                    due_ok = False
+                    break
+        if due_ok:
+            tuntas += 1
+
+    hipertensi_re = re.compile(r"(hipertensi|preeklams|pre-?eklams|darah tinggi)", re.I)
+    dm_re = re.compile(r"(diabetes|kencing manis|\bdm\b)", re.I)
+    penyakit = {"Hipertensi / Preeklamsia": 0, "Diabetes Melitus": 0, "Penyakit Lainnya": 0}
+    penyulit_counter = {}
+    for p in patients:
+        s = (p.get("penyakit_penyerta") or "").strip()
+        if s and s.lower() not in ("-", "tidak ada"):
+            if hipertensi_re.search(s):
+                penyakit["Hipertensi / Preeklamsia"] += 1
+            elif dm_re.search(s):
+                penyakit["Diabetes Melitus"] += 1
+            else:
+                penyakit["Penyakit Lainnya"] += 1
+        for r in p.get("riwayat_kehamilan", []):
+            v = (r.get("penyulit") or "").strip()
+            if v and v not in ("Tidak ada", "Lainnya"):
+                penyulit_counter[v] = penyulit_counter.get(v, 0) + 1
+        mp = (p.get("masalah_persalinan") or "").strip()
+        if mp:
+            key = f"Persalinan: {mp}"
+            penyulit_counter[key] = penyulit_counter.get(key, 0) + 1
+
+    total = len(patients)
+    penyakit_list = [{"nama": k, "jumlah": v, "persen": round(v / total * 100) if total else 0} for k, v in penyakit.items() if v > 0]
+    penyulit_list = sorted(
+        [{"nama": k, "jumlah": v, "persen": round(v / total * 100) if total else 0} for k, v in penyulit_counter.items()],
+        key=lambda x: -x["jumlah"],
+    )[:10]
+    return {
+        "total": total,
+        "tuntas": tuntas,
+        "tuntas_persen": round(tuntas / total * 100) if total else 0,
+        "lost": lost,
+        "lost_persen": round(lost / total * 100) if total else 0,
+        "anc": anc_stats,
+        "pnc": kf_stats,
+        "penyakit": penyakit_list,
+        "penyulit": penyulit_list,
+    }
 
 
 # ---------- KUPON PIJAT BAYI ----------
