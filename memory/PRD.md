@@ -43,6 +43,18 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 ## Iterasi 5 (Sept 2026)
 - Pembungkus desktop Windows: /app/electron (Electron + electron-builder NSIS) + GitHub Actions workflow /.github/workflows/build-windows.yml untuk build .exe otomatis di cloud. URL aplikasi diatur via electron/config.json.
 
+## Iterasi 6 (Sept 2026) — 10 fitur permintaan bidan
+1. Riwayat kehamilan terstruktur (tahun/tempat/penolong/hasil/penyulit) — repeater di PatientForm, tampil di detail
+2. Indikator daftar pasien: selisih_hari (X hari lagi / Terlambat X hari), kontrol fase ke/total + pill Lengkap, legend ANC/KF
+3. EdukasiBlast: checkbox pemilih materi (tidak otomatis kirim semua)
+4. Timeline kunjungan di profil pasien (K1-K6 per trimester + KF1-KF4, ringkasan lengkap/tidak per fase) — Timeline.jsx + build_timeline backend
+5. Kontrol nifas: jenis KB + kontrol rutin KB + imunisasi diberikan + usia bayi — CheckupForm
+6. Checklist imunisasi IDAI Edisi 7 (2024): 11 titik jadwal HB-0 s/d booster 18 bulan, status selesai/terlambat/mendekati — ImunisasiPanel.jsx + /api/patients/{id}/imunisasi
+7. Rencana Tindak Lanjut (RTL) per kontrol — tampil di kartu jadwal & tabel riwayat
+8. Tandai persalinan lengkap: nama anak, jenis kelamin, cara lahir, tempat, penolong, masalah persalinan
+9. Template WA imunisasi memakai nama anak (fallback "anak dari Ibu X") via imunisasi_berikutnya
+10. Template WA promo pijat bayi memakai nama anak + promo khusus jika anc_lengkap (ANC ≥6x)
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

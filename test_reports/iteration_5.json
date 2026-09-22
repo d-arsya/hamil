@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration-5 verified 10 new bidan features on BidanKu. Backend: added /app/backend/tests/test_iteration5.py (14 tests) covering riwayat_kehamilan persistence, new indicator fields (selisih_hari, kontrol_fase_ke/total, anc_lengkap, rtl_berikutnya, imunisasi_berikutnya, baby fields), timeline structure (K1-K6 for hamil / KF1-KF4 for nifas + ringkasan per fase), delivery extended fields (nama_anak/jenis_kelamin/cara_lahir/tempat/penolong/masalah), imunisasi endpoints (GET 11-item IDAI schedule with status per usia_bayi_hari, POST 400 before-persalinan/invalid-kode/duplicate, POST-then-GET status flips to Selesai, imunisasi_berikutnya advances, DELETE 200 & 404), checkup RTL + nifas-only KB & imunisasi_diberikan fields, anc_lengkap flag after 6 ANC. Full backend suite 72/72 PASS on preview URL (58 prior + 14 new, pytest -n 0). Frontend Playwright on preview URL: LOGIN admin/admin123 OK; Daftar Pasien renders filter-legend with the mandated 'Mendekati/Terlambat/Sudah Kontrol + ANC T1=2x/T2=1x/T3=3x, Nifas=4x' text, all 8 rows expose kontrol-progress-{id} ('Kontrol T3: 0/3 Belum lengkap' / 'Kontrol T1: 2/2 Lengkap' pill) and selisih-hari-{id} ('Terlambat 274 hari' / '9 hari lagi'); PatientForm riwayat repeater — riwayat-add-button appends row 0 with tahun/tempat/penolong/hasil/penyulit/delete testids all present; TEST Nifas Lengkap detail page: timeline-card with 4 timeline-group-* sections + 4 timeline-summary-* pills (T1 Lengkap 2/2, T2 Lengkap 1/1, T3 Lengkap 3/3, Nifas Tidak lengkap 0/4) and 10 timeline-item-* (K1-K6 tercapai, KF1-KF4 belum kontrol); Riwayat Kehamilan Sebelumnya block shows entry 2022 Lahir hidup RSUD Sleman dr. Budi with 'penyulit: Preeklamsia' in red; ImunisasiPanel shows 11 imunisasi-row-* with hb0 pill 'Selesai' + tanggal (22 Sep 2026) and bcg_polio0 'Terlambat', WA modal from imunisasi-remind-button opens with 5 wa-template-* tabs (rutin/terlambat/nifas/imunisasi/promo) and imunisasi template body contains 'Bima' + vaksin + tanggal; promo tab contains 'PROMO KHUSUS' because pasien anc_lengkap (6 ANC recorded); Edukasi blast modal from menu Edukasi shows blast-msg-* checkboxes + edukasi-blast-count + textarea updates when a checkbox is toggled. All previous iteration-1..4 flows (dashboard stats, WA modal, mark-delivery min/max/helper, patient list filters, kupon-badge) still intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration3.py",
+    "/app/backend/tests/test_regression_iter2.py",
+    "/app/backend/tests/test_status_logic.py",
+    "/app/backend/tests/test_persalinan_validation.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is ~683 lines and still monolithic — consider splitting into routers/patients.py, routers/imunisasi.py, services/status.py, services/timeline.py once the feature set stabilises (>700-line threshold approaching).",
+    "compute_status() logic (T1/T2/T3 offsets 0/2/3) is coupled to the specific ANC_WEEKS layout; if bidan later changes ANC schedule this will silently mis-compute fase_ke/total — extract a data-driven map of {fase: [indices]} to avoid hard-coded offsets.",
+    "GET /api/patients/{id}/imunisasi computes status ad-hoc while serialize_patient computes imunisasi_berikutnya independently — extract a shared helper so 'terlambat/mendekati' thresholds don't drift between endpoints.",
+    "delete_patient does not delete /imunisasi records (only /checkups). If a patient is deleted post-persalinan, orphan imunisasi docs remain in the imunisasi collection. Low-severity but should be cleaned up for data hygiene.",
+    "PatientInput.riwayat_kehamilan uses list[RiwayatItem] but no server-side length cap — a malicious client could POST thousands of entries. Consider Field(max_length=20)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration5.py"],
+  "success_rate": {"backend": "100% (72/72 pytest, 14 new + 58 regression)", "frontend": "100% on preview URL — legend, indicators, riwayat repeater, timeline, imunisasi panel, WA templates (imunisasi & promo), edukasi blast picker all verified live"},
+  "test_credentials": "admin / admin123 (verified)",
+  "seed_data_creation": "Test-created TEST_ITER5_* patients are auto-deleted by pytest fixtures. Pre-existing 'TEST Nifas Lengkap' seeded by main agent was consumed for UI checks then DELETED via API at the end (verified). login_attempts collection cleared. No residual TEST_* data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run backend regression: cd /app/backend && REACT_APP_BACKEND_URL=<preview> python -m pytest tests/ -q -n 0 (72 tests, ~60s). pytest.ini has -n 2 --dist loadscope by default; override with -n 0 to serialise if hitting rate limits. Frontend testids for the new features: filter-legend, kontrol-progress-{id}, selisih-hari-{id}, riwayat-add-button, riwayat-{tahun|tempat|penolong|hasil|penyulit|delete}-{i}, riwayat-list, riwayat-item-{i}, timeline-card, timeline-group-{fase}, timeline-summary-{fase}, timeline-item-{K1..K6|KF1..KF4}, imunisasi-panel, imunisasi-row-{kode}, imunisasi-done-{kode}, imunisasi-delete-{kode}, imunisasi-status-{kode}, imunisasi-remind-button, wa-template-{rutin|terlambat|nifas|imunisasi|promo}, delivery-{nama-anak|jenis-kelamin|cara-lahir|tempat-lahir|penolong|masalah}, checkup-nifas-section, checkup-form-{kb|imunisasi|kontrol-kb|rtl}, blast-msg-{id}, edukasi-blast-count. Preview URL: https://antenatal-postnatal.preview.emergentagent.com. After lockout testing: mongosh test_database --eval 'db.login_attempts.deleteMany({})'.",
+  "rca_of_the_issue": "N/A — this iteration validated 10 new features rather than fixing a bug. No defects surfaced during backend pytest (72/72) or live UI Playwright verification on the preview URL."
+}

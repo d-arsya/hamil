@@ -439,6 +439,7 @@ async def delete_patient(patient_id: str, user=Depends(get_current_user)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
     await db.checkups.delete_many({"patient_id": patient_id})
+    await db.imunisasi.delete_many({"patient_id": patient_id})
     return {"ok": True}
 
 
