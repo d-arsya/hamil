@@ -97,7 +97,7 @@ export default function Login() {
               {loading ? "Memproses..." : "Masuk"}
             </button>
           </form>
-          <p className="text-[11px] text-slate-400 mt-6">Demo: username <span className="font-semibold">admin</span>, password <span className="font-semibold">admin123</span></p>
+          <p className="text-[11px] text-slate-400 mt-6">Hubungi bidan/admin pemilik akun jika lupa kredensial.</p>
         </div>
       </div>
     </div>

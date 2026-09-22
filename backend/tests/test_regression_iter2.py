@@ -10,9 +10,21 @@ import pytest
 import requests
 from dotenv import dotenv_values
 
+# --- SEC-001: read admin password from /app/memory/test_credentials.md ---
+import re as _re_pw
+from pathlib import Path as _Path_pw
+def _read_admin_password():
+    _p = _Path_pw("/app/memory/test_credentials.md")
+    if _p.exists():
+        _m = _re_pw.search(r"Password:\s*`([^`]+)`", _p.read_text())
+        if _m: return _m.group(1)
+    return "admin123"
+ADMIN_PASSWORD = _read_admin_password()
+
+
 fe = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or fe["REACT_APP_BACKEND_URL"]).rstrip("/")
-CREDS = {"username": "admin", "password": "admin123"}
+CREDS = {"username": "admin", "password": ADMIN_PASSWORD}
 
 
 def clear_login_attempts():

@@ -850,7 +850,7 @@ async def startup():
     await db.imunisasi.create_index("patient_id")
     await db.login_attempts.create_index("username", unique=True)
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
-    password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    password = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"username": username})
     if not existing:
         await db.users.insert_one({

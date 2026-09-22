@@ -1,0 +1,43 @@
+{
+  "summary": "Security audit fix (SEC-001) verified end-to-end. Old default 'admin123' and env-only 'BdK#m7Q2vX9pL4zR' both rejected (401). Active password 'Bidan#Aman2026xY9' works (200) and PERSISTS across backend restart (no re-sync). New /api/auth/change-password endpoint validates auth (401), old password (400), min length 8 (400) and succeeds (200). Frontend modal flow (change-password-button → change-password-modal with pw-old/new/confirm-input, pw-submit-button) passes all 4 UX cases and password is fully restored to Bidan#Aman2026xY9. Full regression suite: 95 pytest tests pass (88 legacy + 7 new).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/login", "issues": ["Login page still displays 'Demo: username admin, password admin123' (Login.jsx line 100). After SEC-001 fix, this hint is (a) factually incorrect and (b) leaks a default-credential pattern - should be removed or replaced with a neutral 'Hubungi admin untuk kredensial' notice."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_change_password.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Remove/replace stale 'password admin123' demo hint on Login page (/app/frontend/src/pages/Login.jsx:100) - it leaks default-credential info and is no longer valid post SEC-001."
+  ],
+  "critical_code_review_comments": [
+    "server.py:853 - fallback default 'admin123' in os.environ.get('ADMIN_PASSWORD', 'admin123') should be removed; if ADMIN_PASSWORD is missing at first seed, prefer to fail fast or generate a random secure secret and log it (never hardcode).",
+    "server.py change-password endpoint does not enforce complexity (uppercase/digit/symbol) - only min length 8. Consider stronger policy for a health-data admin account.",
+    "Login page in Login.jsx still surfaces the old default password to any visitor - remove for production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_change_password.py (new - 7 tests for SEC-001 fix)",
+    "/app/backend/tests/conftest.py (new - shared ADMIN_PASSWORD reader)",
+    "/app/backend/tests/test_iteration3.py (replaced hardcoded admin123 with ADMIN_PASSWORD from test_credentials.md)",
+    "/app/backend/tests/test_iteration5.py (same)",
+    "/app/backend/tests/test_iteration6.py (same)",
+    "/app/backend/tests/test_iteration7.py (same)",
+    "/app/backend/tests/test_status_logic.py (same)",
+    "/app/backend/tests/test_regression_iter2.py (same)",
+    "/app/backend/tests/test_persalinan_validation.py (same)",
+    "/app/memory/test_credentials.md (corrected password to actual live value Bidan#Aman2026xY9)"
+  ],
+  "success_rate": {"backend": "100% (95/95)", "frontend": "100% (9/9 UI steps)"},
+  "test_credentials": "admin / Bidan#Aman2026xY9 (verified active; test_credentials.md updated)",
+  "seed_data_creation": "None - existing seeded admin used. All TEST_ patients/templates created by tests are cleaned up in fixture teardown. Login-attempts collection cleaned after lockout tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Live admin password is 'Bidan#Aman2026xY9' and MUST match test_credentials.md. Backend .env still holds old seed value 'BdK#m7Q2vX9pL4zR' - this is intentional (env used only at first seed; startup no longer re-syncs). If any test changes password, restore via POST /api/auth/change-password before finishing. All existing test files now read the password from /app/memory/test_credentials.md via inline helper (SEC-001 patch); if password rotates again, only update test_credentials.md.",
+  "rca_of_the_issue": "SEC-001 (already fixed by main agent): startup() previously re-hashed ADMIN_PASSWORD from env on every restart, negating password changes. Fix: startup only seeds if user is absent (server.py:854-865); new POST /api/auth/change-password (server.py:378-386) verifies old password, enforces min 8 chars, and updates users.password_hash. Verified: (1) restart does NOT reset password back to env value, (2) old admin123 returns 401, (3) UI flow works end-to-end, (4) all error branches (401/400 wrong-old, 400 min-length, 401 unauth) covered by tests."
+}

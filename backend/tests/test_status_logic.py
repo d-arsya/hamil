@@ -6,6 +6,18 @@ import pytest
 import requests
 from dotenv import dotenv_values
 
+# --- SEC-001: read admin password from /app/memory/test_credentials.md ---
+import re as _re_pw
+from pathlib import Path as _Path_pw
+def _read_admin_password():
+    _p = _Path_pw("/app/memory/test_credentials.md")
+    if _p.exists():
+        _m = _re_pw.search(r"Password:\s*`([^`]+)`", _p.read_text())
+        if _m: return _m.group(1)
+    return "admin123"
+ADMIN_PASSWORD = _read_admin_password()
+
+
 fe = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or fe["REACT_APP_BACKEND_URL"]).rstrip("/")
 
@@ -14,7 +26,7 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or fe["REACT_APP_BACKEND_URL
 def client():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
-    r = s.post(f"{BASE_URL}/api/auth/login", json={"username": "admin", "password": "admin123"}, timeout=30)
+    r = s.post(f"{BASE_URL}/api/auth/login", json={"username": "admin", "password": ADMIN_PASSWORD}, timeout=30)
     assert r.status_code == 200, r.text
     s.headers.update({"Authorization": f"Bearer {r.json()['token']}"})
     return s
