@@ -37,18 +37,24 @@ function Field({ label, hint, children }) {
 export default function PatientForm({ open, onClose, onSaved, initial }) {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [penyulitCustoms, setPenyulitCustoms] = useState([]);
   const isEdit = Boolean(initial?.id);
 
   useEffect(() => {
-    if (open) setForm(initial ? { ...empty, ...initial } : empty);
+    if (open) {
+      setForm(initial ? { ...empty, ...initial } : empty);
+      api.get("/options/penyulit").then((r) => setPenyulitCustoms(r.data.custom || [])).catch(() => {});
+    }
   }, [open, initial]);
+
+  const penyulitOptions = [...PENYULIT_OPTIONS.filter((o) => o !== "Lainnya"), ...penyulitCustoms, "Lainnya"];
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const addRiwayat = () =>
     setForm((f) => ({
       ...f,
-      riwayat_kehamilan: [...(f.riwayat_kehamilan || []), { tahun: "", tempat: "", penolong: "", hasil: "Lahir hidup", penyulit: "Tidak ada" }],
+      riwayat_kehamilan: [...(f.riwayat_kehamilan || []), { tahun: "", tempat: "", penolong: "", hasil: "Lahir hidup", cara_lahir: "", penyulit: "Tidak ada" }],
     }));
   const setRiwayat = (i, k) => (e) =>
     setForm((f) => {
@@ -136,22 +142,48 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
           <div className="space-y-2">
             {(form.riwayat_kehamilan || []).map((r, i) => (
               <div key={i} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2" data-testid={`riwayat-row-${i}`}>
-                <div className="grid grid-cols-3 gap-2">
-                  <input data-testid={`riwayat-tahun-${i}`} className={inputCls} value={r.tahun} onChange={setRiwayat(i, "tahun")} placeholder="Tahun lahir" />
-                  <input data-testid={`riwayat-tempat-${i}`} className={inputCls} value={r.tempat} onChange={setRiwayat(i, "tempat")} placeholder="Tempat (RS/puskesmas)" />
-                  <input data-testid={`riwayat-penolong-${i}`} className={inputCls} value={r.penolong} onChange={setRiwayat(i, "penolong")} placeholder="Penolong (bidan/dokter)" />
-                </div>
-                <div className="grid grid-cols-3 gap-2 items-center">
-                  <select data-testid={`riwayat-hasil-${i}`} className={inputCls} value={r.hasil} onChange={setRiwayat(i, "hasil")}>
-                    {HASIL_OPTIONS.map((o) => <option key={o}>{o}</option>)}
-                  </select>
-                  <select data-testid={`riwayat-penyulit-${i}`} className={inputCls} value={r.penyulit} onChange={setRiwayat(i, "penyulit")}>
-                    {PENYULIT_OPTIONS.map((o) => <option key={o}>{o}</option>)}
-                  </select>
-                  <button type="button" data-testid={`riwayat-delete-${i}`} onClick={() => delRiwayat(i)} className="text-xs font-semibold text-red-600 hover:underline text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500">Riwayat #{i + 1}</span>
+                  <button type="button" data-testid={`riwayat-delete-${i}`} onClick={() => delRiwayat(i)} className="text-xs font-semibold text-red-600 hover:underline">
                     Hapus
                   </button>
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input data-testid={`riwayat-tahun-${i}`} className={inputCls} value={r.tahun} onChange={setRiwayat(i, "tahun")} placeholder="Tahun lahir (cth: 2022)" />
+                  <input data-testid={`riwayat-tempat-${i}`} className={inputCls} value={r.tempat} onChange={setRiwayat(i, "tempat")} placeholder="Tempat (RS/puskesmas/rumah)" />
+                  <input data-testid={`riwayat-penolong-${i}`} className={inputCls} value={r.penolong} onChange={setRiwayat(i, "penolong")} placeholder="Ditolong nakes (cth: Bidan Ani)" />
+                  <select data-testid={`riwayat-hasil-${i}`} className={inputCls} value={r.hasil} onChange={setRiwayat(i, "hasil")}>
+                    {HASIL_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                  <select data-testid={`riwayat-cara-lahir-${i}`} className={inputCls} value={r.cara_lahir || ""} onChange={setRiwayat(i, "cara_lahir")}>
+                    <option value="">Cara lahir...</option>
+                    <option>Normal - Spontan</option>
+                    <option>Normal - Vakum/Forceps</option>
+                    <option>Sesar (SC)</option>
+                  </select>
+                  <select
+                    data-testid={`riwayat-penyulit-${i}`}
+                    className={inputCls}
+                    value={penyulitOptions.includes(r.penyulit) ? r.penyulit : "Lainnya"}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const r2 = [...(form.riwayat_kehamilan || [])];
+                      r2[i] = { ...r2[i], penyulit: v === "Lainnya" ? "" : v };
+                      setForm((f) => ({ ...f, riwayat_kehamilan: r2 }));
+                    }}
+                  >
+                    {penyulitOptions.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                {!penyulitOptions.includes(r.penyulit) && (
+                  <input
+                    data-testid={`riwayat-penyulit-custom-${i}`}
+                    className={inputCls}
+                    value={r.penyulit}
+                    onChange={setRiwayat(i, "penyulit")}
+                    placeholder="Tulis masalah/penyulit lainnya — otomatis jadi pilihan untuk pengisian berikutnya"
+                  />
+                )}
               </div>
             ))}
           </div>

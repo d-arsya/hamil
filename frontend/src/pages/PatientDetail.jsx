@@ -145,6 +145,26 @@ export default function PatientDetail() {
               <Baby className="w-4 h-4" /> Tandai Persalinan
             </button>
           )}
+          {p.fase === "nifas" && (
+            <button
+              data-testid="edit-delivery-button"
+              onClick={() => {
+                setDeliveryData({
+                  tanggal: p.tanggal_persalinan || "",
+                  nama_anak: p.nama_anak || "",
+                  jenis_kelamin_anak: p.jenis_kelamin_anak || "",
+                  cara_lahir: p.cara_lahir || "",
+                  tempat_lahir: p.tempat_lahir || "",
+                  penolong_persalinan: p.penolong_persalinan || "",
+                  masalah_persalinan: p.masalah_persalinan || "",
+                });
+                setDeliveryOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
+            >
+              <Pencil className="w-4 h-4" /> Edit Persalinan
+            </button>
+          )}
           <button
             data-testid="edit-patient-button"
             onClick={() => setEditOpen(true)}
@@ -243,6 +263,7 @@ export default function PatientDetail() {
                   <div key={i} className="text-xs text-slate-600 flex flex-wrap gap-x-2" data-testid={`riwayat-item-${i}`}>
                     <span className="font-semibold">{r.tahun || "-"}</span>
                     <span>· {r.hasil || "-"}</span>
+                    {r.cara_lahir && <span>· {r.cara_lahir}</span>}
                     <span>· di {r.tempat || "-"}</span>
                     <span>· oleh {r.penolong || "-"}</span>
                     {r.penyulit && r.penyulit !== "Tidak ada" && (
@@ -391,7 +412,7 @@ export default function PatientDetail() {
       <CheckupForm open={checkupOpen} onClose={() => setCheckupOpen(false)} onSaved={load} patient={p} />
       <WaReminder open={waOpen} onClose={() => { setWaOpen(false); setWaTemplate(null); }} patient={p} bidanNama={user?.nama} initialTemplate={waTemplate} />
 
-      <Modal open={deliveryOpen} onClose={() => setDeliveryOpen(false)} title="Tandai Persalinan" testid="delivery-modal">
+      <Modal open={deliveryOpen} onClose={() => setDeliveryOpen(false)} title={p.tanggal_persalinan ? "Edit Data Persalinan & Bayi" : "Tandai Persalinan"} testid="delivery-modal">
         <div className="space-y-4">
           <p className="text-sm text-slate-500">Setelah persalinan dicatat, pasien masuk <span className="font-semibold text-purple-700">fase nifas</span> dan jadwal kontrol berubah menjadi kunjungan KF1–KF4.</p>
           <div>
@@ -487,7 +508,7 @@ export default function PatientDetail() {
             onClick={saveDelivery}
             className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-colors"
           >
-            Simpan — Masuk Fase Nifas
+            {p.tanggal_persalinan ? "Simpan Perubahan" : "Simpan — Masuk Fase Nifas"}
           </button>
         </div>
       </Modal>

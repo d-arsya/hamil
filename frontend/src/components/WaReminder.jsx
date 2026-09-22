@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, MessageCircle } from "lucide-react";
+import { Check, Copy, MessageCircle, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Modal from "./Modal";
+import api from "../lib/api";
 import { fmtDate, sanitizePhone, usiaLabel, waUrl } from "../lib/utils-id";
 
 const buildTemplates = (p, bidanNama) => {
@@ -23,6 +24,8 @@ export default function WaReminder({ open, onClose, patient, bidanNama, initialT
   const [templateKey, setTemplateKey] = useState("rutin");
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState([]);
+  const [saveJudul, setSaveJudul] = useState("");
 
   const templates = useMemo(() => (patient ? buildTemplates(patient, bidanNama || "Kita") : {}), [patient, bidanNama]);
 
@@ -33,15 +36,53 @@ export default function WaReminder({ open, onClose, patient, bidanNama, initialT
       setTemplateKey(def);
       setMessage(templates[def] || "");
       setCopied(false);
+      setSaveJudul("");
+      api.get("/templates").then((r) => setCustomTemplates(r.data)).catch(() => {});
     }
   }, [open, patient, templates, initialTemplate]);
 
   if (!patient) return null;
 
+  const applyPlaceholders = (text) =>
+    text
+      .replaceAll("{nama}", patient.nama)
+      .replaceAll("{anak}", patient.nama_anak || `anak dari Ibu ${patient.nama}`)
+      .replaceAll("{jadwal}", fmtDate(patient.jadwal_berikutnya));
+
   const pickTemplate = (k) => {
     setTemplateKey(k);
-    setMessage(templates[k]);
+    if (k.startsWith("custom:")) {
+      const t = customTemplates.find((x) => `custom:${x.id}` === k);
+      setMessage(applyPlaceholders(t?.isi || ""));
+    } else {
+      setMessage(templates[k]);
+    }
     setCopied(false);
+  };
+
+  const saveTemplate = async () => {
+    if (!saveJudul.trim() || !message.trim()) {
+      toast.error("Isi judul dan pesan dulu");
+      return;
+    }
+    try {
+      await api.post("/templates", { judul: saveJudul.trim(), isi: message });
+      toast.success("Template tersimpan — bisa dipakai lagi kapan saja");
+      setSaveJudul("");
+      const r = await api.get("/templates");
+      setCustomTemplates(r.data);
+    } catch {
+      toast.error("Gagal menyimpan template");
+    }
+  };
+
+  const deleteTemplate = async () => {
+    const id = templateKey.replace("custom:", "");
+    await api.delete(`/templates/${id}`);
+    toast.success("Template dihapus");
+    setCustomTemplates((s) => s.filter((t) => t.id !== id));
+    setTemplateKey("rutin");
+    setMessage(templates.rutin);
   };
 
   const copy = async () => {
@@ -71,6 +112,7 @@ export default function WaReminder({ open, onClose, patient, bidanNama, initialT
     ["nifas", "Kunjungan Nifas"],
     ["imunisasi", "Imunisasi Bayi"],
     ["promo", "Promo Pijat Bayi"],
+    ...customTemplates.map((t) => [`custom:${t.id}`, t.judul]),
   ];
 
   return (
@@ -103,6 +145,29 @@ export default function WaReminder({ open, onClose, patient, bidanNama, initialT
             }}
           />
         </div>
+        <div className="flex gap-2">
+          <input
+            data-testid="wa-template-judul"
+            className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
+            placeholder="Judul template untuk disimpan (cth: Promo paket imunisasi)"
+            value={saveJudul}
+            onChange={(e) => setSaveJudul(e.target.value)}
+          />
+          <button
+            data-testid="wa-template-save"
+            onClick={saveTemplate}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Simpan Template
+          </button>
+        </div>
+        {templateKey.startsWith("custom:") && (
+          <button data-testid="wa-template-delete" onClick={deleteTemplate} className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline">
+            <Trash2 className="w-3.5 h-3.5" /> Hapus template ini
+          </button>
+        )}
+        <p className="text-[11px] text-slate-400 -mt-1">Di template tersimpan, tulis {"{nama}"}, {"{anak}"}, atau {"{jadwal}"} untuk otomatis diganti data pasien saat dipilih.</p>
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             data-testid="wa-copy-button"

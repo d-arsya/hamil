@@ -18,12 +18,12 @@ function Field({ label, hint, children }) {
 
 export default function CheckupForm({ open, onClose, onSaved, patient }) {
   const today = new Date().toISOString().slice(0, 10);
-  const empty = { tanggal: today, sistolik: "", diastolik: "", berat_badan: "", tinggi_fundus: "", djj: "", keluhan: "", catatan: "", rencana_tindak_lanjut: "", jenis_kb: "", kontrol_kb: false, imunisasi_diberikan: "" };
+  const empty = { tanggal: today, jenis: "anc", sistolik: "", diastolik: "", berat_badan: "", tinggi_fundus: "", djj: "", keluhan: "", catatan: "", rencana_tindak_lanjut: "", jenis_kb: "", kontrol_kb: false, imunisasi_diberikan: "" };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setForm({ ...empty, tanggal: today });
+    if (open) setForm({ ...empty, tanggal: today, jenis: patient?.fase === "nifas" ? "kf" : "anc" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -44,9 +44,10 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
         keluhan: form.keluhan,
         catatan: form.catatan,
         rencana_tindak_lanjut: form.rencana_tindak_lanjut,
-        jenis_kb: patient.fase === "nifas" ? form.jenis_kb : "",
-        kontrol_kb: patient.fase === "nifas" ? form.kontrol_kb : false,
-        imunisasi_diberikan: patient.fase === "nifas" ? form.imunisasi_diberikan : "",
+        jenis: form.jenis,
+        jenis_kb: form.jenis === "kf" ? form.jenis_kb : "",
+        kontrol_kb: form.jenis === "kf" ? form.kontrol_kb : false,
+        imunisasi_diberikan: form.jenis === "kf" ? form.imunisasi_diberikan : "",
       });
       toast.success("Kontrol berhasil dicatat — status pasien diperbarui");
       onSaved();
@@ -58,12 +59,15 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
     }
   };
 
-  const jenisLabel = patient?.fase === "nifas" ? `Kunjungan Nifas (${patient.kunjungan_berikutnya || "KF"})` : `Pemeriksaan ANC (${patient?.kunjungan_berikutnya || "K"})`;
-
   return (
     <Modal open={open} onClose={onClose} title={`Catat Kontrol — ${patient?.nama || ""}`} testid="checkup-form-modal">
-      <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-[#FDF2F5] text-[#C02650] text-xs font-semibold" data-testid="checkup-jenis-label">
-        {jenisLabel}
+      <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-[#FDF2F5]" data-testid="checkup-jenis-label">
+        <label className="block text-[11px] font-bold text-[#C02650] mb-1">Jenis Kunjungan</label>
+        <select data-testid="checkup-form-jenis" className={inputCls} value={form.jenis} onChange={set("jenis")}>
+          <option value="anc">ANC — Antenatal (kontrol kehamilan)</option>
+          <option value="kf">PNC — Postnatal (kontrol nifas)</option>
+        </select>
+        <p className="text-[11px] text-slate-400 mt-1">Pilih PNC jika kunjungan ini untuk nifas meskipun pasien belum ditandai persalinan, atau sebaliknya.</p>
       </div>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Tanggal Kontrol">
@@ -88,9 +92,11 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
             <input data-testid="checkup-form-djj" type="number" className={inputCls} value={form.djj} onChange={set("djj")} />
           </Field>
         </div>
-        {patient?.fase === "nifas" && (
+        {form.jenis === "kf" && (
           <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-100 space-y-3" data-testid="checkup-nifas-section">
-            <div className="text-xs font-bold text-purple-700">Khusus Masa Nifas — bayi berusia {patient.hari_nifas ?? 0} hari</div>
+            <div className="text-xs font-bold text-purple-700">
+              Khusus Kunjungan Nifas (PNC){patient.tanggal_persalinan ? ` — bayi berusia ${patient.hari_nifas ?? 0} hari` : ""}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Pemasangan / Jenis KB">
                 <select data-testid="checkup-form-kb" className={inputCls} value={form.jenis_kb} onChange={set("jenis_kb")}>

@@ -96,6 +96,7 @@ class RiwayatItem(BaseModel):
     tempat: Optional[str] = ""
     penolong: Optional[str] = ""
     hasil: Optional[str] = ""
+    cara_lahir: Optional[str] = ""
     penyulit: Optional[str] = ""
 
 
@@ -128,6 +129,7 @@ class CheckupInput(BaseModel):
     jenis_kb: Optional[str] = ""
     kontrol_kb: Optional[bool] = False
     imunisasi_diberikan: Optional[str] = ""
+    jenis: Optional[str] = None
 
 
 class DeliveryInput(BaseModel):
@@ -473,7 +475,7 @@ async def add_checkup(patient_id: str, data: CheckupInput, user=Depends(get_curr
     p = await db.patients.find_one({"id": patient_id})
     if not p:
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
-    jenis = "kf" if p.get("tanggal_persalinan") else "anc"
+    jenis = data.jenis if data.jenis in ("anc", "kf") else ("kf" if p.get("tanggal_persalinan") else "anc")
     count = await db.checkups.count_documents({"patient_id": patient_id, "jenis": jenis})
     tanggal = data.tanggal or date.today().isoformat()
     if parse_date(tanggal, "tanggal kontrol") > date.today():
@@ -579,6 +581,52 @@ async def delete_imunisasi(record_id: str, user=Depends(get_current_user)):
     result = await db.imunisasi.delete_one({"id": record_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Catatan imunisasi tidak ditemukan")
+    return {"ok": True}
+
+
+# ---------- OPSI PENYULIT CUSTOM ----------
+PENYULIT_DEFAULT = {"Tidak ada", "Preeklamsia", "Eklampsia", "Vasa previa", "Gangguan plasenta", "Perdarahan akhir kehamilan", "Persalinan prematur", "Lainnya"}
+
+
+@api_router.get("/options/penyulit")
+async def get_penyulit_options(user=Depends(get_current_user)):
+    vals = await db.patients.distinct("riwayat_kehamilan.penyulit")
+    custom = sorted({v.strip() for v in vals if v and v.strip() and v.strip() not in PENYULIT_DEFAULT})
+    return {"custom": custom}
+
+
+# ---------- TEMPLATE WA CUSTOM ----------
+class TemplateInput(BaseModel):
+    judul: str
+    isi: str
+
+
+@api_router.get("/templates")
+async def get_templates(user=Depends(get_current_user)):
+    return await db.templates.find({}, {"_id": 0}).sort("created_at", 1).to_list(200)
+
+
+@api_router.post("/templates")
+async def add_template(data: TemplateInput, user=Depends(get_current_user)):
+    if not data.judul.strip() or not data.isi.strip():
+        raise HTTPException(status_code=400, detail="Judul dan isi template wajib diisi")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "judul": data.judul.strip(),
+        "isi": data.isi.strip(),
+        "oleh": user.get("nama") or user.get("username", ""),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.templates.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/templates/{template_id}")
+async def delete_template(template_id: str, user=Depends(get_current_user)):
+    result = await db.templates.delete_one({"id": template_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Template tidak ditemukan")
     return {"ok": True}
 
 

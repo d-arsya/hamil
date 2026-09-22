@@ -55,6 +55,14 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 9. Template WA imunisasi memakai nama anak (fallback "anak dari Ibu X") via imunisasi_berikutnya
 10. Template WA promo pijat bayi memakai nama anak + promo khusus jika anc_lengkap (ANC ≥6x)
 
+## Iterasi 7 (Sept 2026) — 6 penyempurnaan
+1. Penyulit riwayat kehamilan: pilihan "Lainnya" membuka input custom; nilai custom otomatis jadi opsi di pengisian berikutnya (GET /api/options/penyulit agregasi distinct dari data pasien)
+2. Riwayat kehamilan: tambah pilihan cara lahir (Normal-Spontan / Normal-Vakum/Forceps / Sesar), tampil di profil pasien
+3. Catat kontrol: pilihan jenis kunjungan ANC (antenatal) / PNC (postnatal) via select checkup-form-jenis; backend menerima override jenis; section KB/imunisasi mengikuti PNC
+4. Edit data persalinan & bayi (nama anak, JK, cara lahir, tempat, penolong, masalah) lewat tombol "Edit Persalinan" pada pasien nifas
+5. Template WA custom: judul + isi bisa disimpan (POST /api/templates) dan dipakai ulang; placeholder {nama} {anak} {jadwal} otomatis diganti data pasien; bisa dihapus
+6. Blast edukasi: nomor urut "1. 2." dihapus — pesan gabungan langsung isi materi
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

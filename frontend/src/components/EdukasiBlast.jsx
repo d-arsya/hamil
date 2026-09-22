@@ -23,7 +23,7 @@ export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages 
 
   useEffect(() => {
     if (open) {
-      setText(messages.filter((m) => selected.includes(m.id)).map((m, i) => `${i + 1}. ${m.isi}`).join("\n\n"));
+      setText(messages.filter((m) => selected.includes(m.id)).map((m) => m.isi).join("\n\n"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
