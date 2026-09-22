@@ -6,14 +6,20 @@ import { fmtDate, sanitizePhone, usiaLabel, waUrl } from "../lib/utils-id";
 
 const buildTemplates = (p, bidanNama) => {
   const bidan = /^bidan/i.test(bidanNama || "") ? bidanNama : `Bidan ${bidanNama}`;
+  const anak = p.nama_anak ? p.nama_anak : `anak dari Ibu ${p.nama}`;
+  const imu = p.imunisasi_berikutnya;
   return {
   rutin: `Halo Ibu ${p.nama}, salam sehat dari ${bidan}. Mengingatkan jadwal rutin kontrol ${p.fase === "nifas" ? "nifas" : "kehamilan"} Ibu (${usiaLabel(p)}) pada tanggal ${fmtDate(p.jadwal_berikutnya)}. Mohon datang tepat waktu untuk memantau kesehatan Ibu${p.fase === "nifas" ? " & si kecil" : " & janin"}. Terima kasih.`,
   terlambat: `Halo Ibu ${p.nama}, jadwal kontrol Ibu seharusnya pada ${fmtDate(p.jadwal_berikutnya)} dan sudah terlewat. Kesehatan Ibu dan si kecil sangat penting, yuk segera lakukan pemeriksaan dengan ${bidan}. Balas pesan ini jika ingin penjadwalan ulang.`,
-  nifas: `Halo Ibu ${p.nama}, selamat atas kelahiran si buah hati! Mengingatkan jadwal kunjungan nifas (${p.kunjungan_berikutnya || "KF"}) pada ${fmtDate(p.jadwal_berikutnya)} untuk pemeriksaan pemulihan Ibu dan tumbuh kembang bayi. Ditunggu ya, Bu.`,
+  nifas: `Halo Ibu ${p.nama}, selamat atas kelahiran si buah hati! Mengingatkan jadwal kunjungan nifas (${p.kunjungan_berikutnya || "KF"}) pada ${fmtDate(p.jadwal_berikutnya)} untuk pemeriksaan pemulihan Ibu dan tumbuh kembang ${anak}. Ditunggu ya, Bu.`,
+  imunisasi: imu
+    ? `Halo Ibu ${p.nama}, mengingatkan jadwal imunisasi untuk ${anak}: ${imu.nama} pada tanggal ${fmtDate(imu.tanggal)} (usia ${imu.usia}). Imunisasi penting untuk melindungi si kecil dari penyakit berbahaya. Ditunggu kedatangannya ya, Bu. — ${bidan}`
+    : `Halo Ibu ${p.nama}, seluruh jadwal imunisasi dasar ${anak} sudah tercatat. Tetap jaga kesehatan si kecil ya, Bu. — ${bidan}`,
+  promo: `Halo Ibu ${p.nama}! Kabar gembira dari ${bidan}: kini tersedia layanan PIJAT BAYI untuk ${anak} — membantu si kecil tidur lebih nyenyak, pencernaan lancar, dan tumbuh kembang optimal. ${p.anc_lengkap ? "Dan karena kontrol kehamilan Ibu tercatat LENGKAP, Ibu berhak mendapat PROMO KHUSUS! " : ""}Yuk jadwalkan sesi pijat untuk ${anak}. Balas pesan ini untuk info harga & jadwal.`,
   };
 };
 
-export default function WaReminder({ open, onClose, patient, bidanNama }) {
+export default function WaReminder({ open, onClose, patient, bidanNama, initialTemplate }) {
   const [templateKey, setTemplateKey] = useState("rutin");
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
@@ -22,12 +28,13 @@ export default function WaReminder({ open, onClose, patient, bidanNama }) {
 
   useEffect(() => {
     if (open && patient) {
-      const def = patient.fase === "nifas" ? "nifas" : patient.status === "terlambat" ? "terlambat" : "rutin";
+      const fallback = patient.fase === "nifas" ? "nifas" : patient.status === "terlambat" ? "terlambat" : "rutin";
+      const def = initialTemplate && templates[initialTemplate] ? initialTemplate : fallback;
       setTemplateKey(def);
       setMessage(templates[def] || "");
       setCopied(false);
     }
-  }, [open, patient, templates]);
+  }, [open, patient, templates, initialTemplate]);
 
   if (!patient) return null;
 
@@ -62,6 +69,8 @@ export default function WaReminder({ open, onClose, patient, bidanNama }) {
     ["rutin", "Pengingat Rutin"],
     ["terlambat", "Terlambat Kontrol"],
     ["nifas", "Kunjungan Nifas"],
+    ["imunisasi", "Imunisasi Bayi"],
+    ["promo", "Promo Pijat Bayi"],
   ];
 
   return (

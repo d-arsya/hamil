@@ -108,6 +108,10 @@ export default function Patients() {
         ))}
       </div>
 
+      <p className="text-[11px] text-slate-400 mb-5 -mt-2" data-testid="filter-legend">
+        Keterangan: <b>Mendekati</b> = jadwal kontrol dalam 7 hari ke depan · <b>Terlambat</b> = sudah lewat jadwal (jumlah harinya tampil di kolom jadwal) · <b>Sudah Kontrol</b> = kontrol periode berjalan sudah dilakukan. ANC: Trimester 1 = 2x (K1-K2, mgg 12 &amp; 16), Trimester 2 = 1x (K3, mgg 26), Trimester 3 = 3x (K4-K6, mgg 32/36/39), Nifas = 4x (KF1-KF4, hari ke-2/7/14/42).
+      </p>
+
       {!patients ? (
         <div className="text-sm text-slate-400 animate-pulse" data-testid="patients-loading">Memuat data pasien...</div>
       ) : filtered.length === 0 ? (
@@ -155,10 +159,28 @@ export default function Patients() {
                   <td className="px-5 py-3.5">
                     <FaseBadge fase={p.fase} />
                     <div className="text-xs text-slate-500 mt-1">{usiaLabel(p)}</div>
+                    <div className="text-xs mt-1 flex items-center gap-1.5" data-testid={`kontrol-progress-${p.id}`}>
+                      <span className="text-slate-500">Kontrol {p.fase === "nifas" ? "KF" : p.fase.replace("trimester_", "T")}: {p.kontrol_fase_ke}/{p.kontrol_fase_total}</span>
+                      {p.kontrol_fase_ke >= p.kontrol_fase_total ? (
+                        <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">Lengkap</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">Belum lengkap</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="font-semibold text-slate-800">{fmtDate(p.jadwal_berikutnya)}</div>
                     <div className="text-xs text-slate-400">{p.kunjungan_berikutnya ? `Kunjungan ${p.kunjungan_berikutnya}` : "-"}</div>
+                    {p.selisih_hari != null && (
+                      <div
+                        data-testid={`selisih-hari-${p.id}`}
+                        className={`text-[11px] font-semibold mt-0.5 ${
+                          p.selisih_hari < 0 ? "text-red-600" : p.selisih_hari <= 7 ? "text-amber-600" : "text-slate-400"
+                        }`}
+                      >
+                        {p.selisih_hari < 0 ? `Terlambat ${-p.selisih_hari} hari` : p.selisih_hari === 0 ? "Jatuh tempo hari ini" : `${p.selisih_hari} hari lagi`}
+                      </div>
+                    )}
                   </td>
                   <td className="px-5 py-3.5">
                     <StatusBadge status={p.status} />

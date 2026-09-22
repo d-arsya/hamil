@@ -18,7 +18,7 @@ function Field({ label, hint, children }) {
 
 export default function CheckupForm({ open, onClose, onSaved, patient }) {
   const today = new Date().toISOString().slice(0, 10);
-  const empty = { tanggal: today, sistolik: "", diastolik: "", berat_badan: "", tinggi_fundus: "", djj: "", keluhan: "", catatan: "" };
+  const empty = { tanggal: today, sistolik: "", diastolik: "", berat_badan: "", tinggi_fundus: "", djj: "", keluhan: "", catatan: "", rencana_tindak_lanjut: "", jenis_kb: "", kontrol_kb: false, imunisasi_diberikan: "" };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
@@ -43,6 +43,10 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
         djj: num(form.djj),
         keluhan: form.keluhan,
         catatan: form.catatan,
+        rencana_tindak_lanjut: form.rencana_tindak_lanjut,
+        jenis_kb: patient.fase === "nifas" ? form.jenis_kb : "",
+        kontrol_kb: patient.fase === "nifas" ? form.kontrol_kb : false,
+        imunisasi_diberikan: patient.fase === "nifas" ? form.imunisasi_diberikan : "",
       });
       toast.success("Kontrol berhasil dicatat — status pasien diperbarui");
       onSaved();
@@ -84,11 +88,46 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
             <input data-testid="checkup-form-djj" type="number" className={inputCls} value={form.djj} onChange={set("djj")} />
           </Field>
         </div>
+        {patient?.fase === "nifas" && (
+          <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-100 space-y-3" data-testid="checkup-nifas-section">
+            <div className="text-xs font-bold text-purple-700">Khusus Masa Nifas — bayi berusia {patient.hari_nifas ?? 0} hari</div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pemasangan / Jenis KB">
+                <select data-testid="checkup-form-kb" className={inputCls} value={form.jenis_kb} onChange={set("jenis_kb")}>
+                  <option value="">Belum / tidak pasang</option>
+                  <option>Suntik 1 bulan</option>
+                  <option>Suntik 3 bulan</option>
+                  <option>Pil KB</option>
+                  <option>Implan (Susuk)</option>
+                  <option>IUD (Spiral)</option>
+                  <option>Kondom</option>
+                  <option>MOW / MOP</option>
+                </select>
+              </Field>
+              <Field label="Imunisasi Bayi yang Diberikan">
+                <input data-testid="checkup-form-imunisasi" className={inputCls} value={form.imunisasi_diberikan} onChange={set("imunisasi_diberikan")} placeholder="cth: HB-0, BCG + Polio 0" />
+              </Field>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                data-testid="checkup-form-kontrol-kb"
+                checked={form.kontrol_kb}
+                onChange={(e) => setForm((f) => ({ ...f, kontrol_kb: e.target.checked }))}
+                className="accent-[#C02650]"
+              />
+              Perlu kontrol rutin untuk KB
+            </label>
+          </div>
+        )}
         <Field label="Keluhan">
           <textarea data-testid="checkup-form-keluhan" className={inputCls} rows={2} value={form.keluhan} onChange={set("keluhan")} placeholder="Keluhan ibu saat kontrol" />
         </Field>
         <Field label="Catatan Bidan">
           <textarea data-testid="checkup-form-catatan" className={inputCls} rows={2} value={form.catatan} onChange={set("catatan")} placeholder="Hasil pemeriksaan, anjuran, terapi" />
+        </Field>
+        <Field label="Rencana Tindak Lanjut (kontrol berikutnya)" hint="cth: cek lab, pantau tekanan darah, USG — akan tampil di kartu jadwal pasien">
+          <textarea data-testid="checkup-form-rtl" className={inputCls} rows={2} value={form.rencana_tindak_lanjut} onChange={set("rencana_tindak_lanjut")} placeholder="Rencana untuk kunjungan berikutnya" />
         </Field>
         <div className="flex gap-3 pt-1">
           <button

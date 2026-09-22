@@ -14,9 +14,12 @@ const empty = {
   abortus: 0,
   penyakit_penyerta: "",
   keluhan_utama: "",
-  riwayat: "",
+  riwayat_kehamilan: [],
   catatan: "",
 };
+
+const HASIL_OPTIONS = ["Lahir hidup", "Abortus", "Lahir mati"];
+const PENYULIT_OPTIONS = ["Tidak ada", "Preeklamsia", "Eklampsia", "Vasa previa", "Gangguan plasenta", "Perdarahan akhir kehamilan", "Persalinan prematur", "Lainnya"];
 
 const inputCls =
   "w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors bg-white";
@@ -41,6 +44,20 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
   }, [open, initial]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const addRiwayat = () =>
+    setForm((f) => ({
+      ...f,
+      riwayat_kehamilan: [...(f.riwayat_kehamilan || []), { tahun: "", tempat: "", penolong: "", hasil: "Lahir hidup", penyulit: "Tidak ada" }],
+    }));
+  const setRiwayat = (i, k) => (e) =>
+    setForm((f) => {
+      const r = [...(f.riwayat_kehamilan || [])];
+      r[i] = { ...r[i], [k]: e.target.value };
+      return { ...f, riwayat_kehamilan: r };
+    });
+  const delRiwayat = (i) =>
+    setForm((f) => ({ ...f, riwayat_kehamilan: (f.riwayat_kehamilan || []).filter((_, idx) => idx !== i) }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -106,9 +123,39 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
             <input data-testid="patient-form-abortus" type="number" min="0" className={inputCls} value={form.abortus} onChange={set("abortus")} />
           </Field>
         </div>
-        <Field label="Riwayat Kehamilan / Penyakit" hint="cth: riwayat SC, hipertensi, diabetes">
-          <textarea data-testid="patient-form-riwayat" className={inputCls} rows={2} value={form.riwayat} onChange={set("riwayat")} />
-        </Field>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold text-slate-600">Riwayat Kehamilan Sebelumnya</label>
+            <button type="button" data-testid="riwayat-add-button" onClick={addRiwayat} className="text-xs font-bold text-[#C02650] hover:underline">
+              + Tambah Riwayat
+            </button>
+          </div>
+          {(form.riwayat_kehamilan || []).length === 0 && (
+            <p className="text-[11px] text-slate-400">Belum ada riwayat (misal kehamilan pertama). Klik tambah untuk mengisi.</p>
+          )}
+          <div className="space-y-2">
+            {(form.riwayat_kehamilan || []).map((r, i) => (
+              <div key={i} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2" data-testid={`riwayat-row-${i}`}>
+                <div className="grid grid-cols-3 gap-2">
+                  <input data-testid={`riwayat-tahun-${i}`} className={inputCls} value={r.tahun} onChange={setRiwayat(i, "tahun")} placeholder="Tahun lahir" />
+                  <input data-testid={`riwayat-tempat-${i}`} className={inputCls} value={r.tempat} onChange={setRiwayat(i, "tempat")} placeholder="Tempat (RS/puskesmas)" />
+                  <input data-testid={`riwayat-penolong-${i}`} className={inputCls} value={r.penolong} onChange={setRiwayat(i, "penolong")} placeholder="Penolong (bidan/dokter)" />
+                </div>
+                <div className="grid grid-cols-3 gap-2 items-center">
+                  <select data-testid={`riwayat-hasil-${i}`} className={inputCls} value={r.hasil} onChange={setRiwayat(i, "hasil")}>
+                    {HASIL_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                  <select data-testid={`riwayat-penyulit-${i}`} className={inputCls} value={r.penyulit} onChange={setRiwayat(i, "penyulit")}>
+                    {PENYULIT_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                  <button type="button" data-testid={`riwayat-delete-${i}`} onClick={() => delRiwayat(i)} className="text-xs font-semibold text-red-600 hover:underline text-left">
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         <Field label="Catatan Tambahan">
           <textarea data-testid="patient-form-catatan" className={inputCls} rows={2} value={form.catatan} onChange={set("catatan")} />
         </Field>

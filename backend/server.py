@@ -91,6 +91,14 @@ class LoginInput(BaseModel):
     password: str
 
 
+class RiwayatItem(BaseModel):
+    tahun: Optional[str] = ""
+    tempat: Optional[str] = ""
+    penolong: Optional[str] = ""
+    hasil: Optional[str] = ""
+    penyulit: Optional[str] = ""
+
+
 class PatientInput(BaseModel):
     nama: str
     no_wa: str
@@ -103,6 +111,7 @@ class PatientInput(BaseModel):
     penyakit_penyerta: Optional[str] = ""
     keluhan_utama: Optional[str] = ""
     riwayat: Optional[str] = ""
+    riwayat_kehamilan: list[RiwayatItem] = []
     catatan: Optional[str] = ""
 
 
@@ -115,10 +124,42 @@ class CheckupInput(BaseModel):
     djj: Optional[int] = None
     keluhan: Optional[str] = ""
     catatan: Optional[str] = ""
+    rencana_tindak_lanjut: Optional[str] = ""
+    jenis_kb: Optional[str] = ""
+    kontrol_kb: Optional[bool] = False
+    imunisasi_diberikan: Optional[str] = ""
 
 
 class DeliveryInput(BaseModel):
     tanggal_persalinan: Optional[str] = None
+    nama_anak: Optional[str] = ""
+    jenis_kelamin_anak: Optional[str] = ""
+    cara_lahir: Optional[str] = ""
+    tempat_lahir: Optional[str] = ""
+    penolong_persalinan: Optional[str] = ""
+    masalah_persalinan: Optional[str] = ""
+
+
+class ImunisasiInput(BaseModel):
+    kode: str
+    tanggal: Optional[str] = None
+    catatan: Optional[str] = ""
+
+
+# Jadwal imunisasi dasar mengacu Pedoman Imunisasi IDAI Edisi 7 (2024)
+IMUNISASI_SCHEDULE = [
+    {"kode": "hb0", "nama": "Hepatitis B (HB-0)", "usia": "0-24 jam", "hari": 0},
+    {"kode": "bcg_polio0", "nama": "BCG + Polio 0", "usia": "0-1 bulan", "hari": 0},
+    {"kode": "polio1", "nama": "Polio 1", "usia": "1 bulan", "hari": 30},
+    {"kode": "bln2", "nama": "DPT-HB-Hib 1 + Polio 2 + PCV 1 + Rotavirus 1", "usia": "2 bulan", "hari": 60},
+    {"kode": "bln3", "nama": "DPT-HB-Hib 2 + Polio 3 + Rotavirus 2", "usia": "3 bulan", "hari": 90},
+    {"kode": "bln4", "nama": "DPT-HB-Hib 3 + Polio 4 + IPV + PCV 2", "usia": "4 bulan", "hari": 120},
+    {"kode": "bln6", "nama": "PCV 3 + Influenza 1", "usia": "6 bulan", "hari": 180},
+    {"kode": "mr1", "nama": "Campak/MR 1", "usia": "9 bulan", "hari": 270},
+    {"kode": "bln12", "nama": "Hepatitis A 1 + Varisela + PCV Booster", "usia": "12 bulan", "hari": 360},
+    {"kode": "mr2", "nama": "Campak/MR 2", "usia": "15 bulan", "hari": 450},
+    {"kode": "bln18", "nama": "DPT-HB-Hib Booster + Polio Booster", "usia": "18 bulan", "hari": 540},
+]
 
 
 def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -> dict:
@@ -158,6 +199,18 @@ def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -
 
     last = max((date.fromisoformat(c["tanggal"]) for c in phase_checks), default=None)
 
+    if persalinan:
+        fase_ke, fase_total = min(done, len(KF_DAYS)), len(KF_DAYS)
+    else:
+        if fase == "trimester_1":
+            fase_total, offset = 2, 0
+        elif fase == "trimester_2":
+            fase_total, offset = 1, 2
+        else:
+            fase_total, offset = 3, 3
+        fase_ke = min(max(done - offset, 0), fase_total)
+    selisih_hari = (next_date - today).days if next_date else None
+
     if next_date is None:
         status = "selesai"
     elif last and prev_date and last >= prev_date:
@@ -181,18 +234,67 @@ def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -
         "kunjungan_berikutnya": kunjungan,
         "status": status,
         "lewat_hpl": (not persalinan) and today > hpl + timedelta(days=7),
+        "selisih_hari": selisih_hari,
+        "kontrol_fase_ke": fase_ke,
+        "kontrol_fase_total": fase_total,
         "kontrol_terakhir": last.isoformat() if last else None,
         "jumlah_kontrol": len(phase_checks),
     }
 
 
-def serialize_patient(p: dict, checkups: list) -> dict:
+def build_timeline(p: dict, checkups: list) -> dict:
+    hpht = date.fromisoformat(p["hpht"])
+    anc = sorted([c for c in checkups if c.get("jenis") == "anc"], key=lambda c: c["tanggal"])
+    kf = sorted([c for c in checkups if c.get("jenis") == "kf"], key=lambda c: c["tanggal"])
+    fase_of_idx = {0: "trimester_1", 1: "trimester_1", 2: "trimester_2", 3: "trimester_3", 4: "trimester_3", 5: "trimester_3"}
+    items = []
+    for i, w in enumerate(ANC_WEEKS):
+        done = anc[i] if i < len(anc) else None
+        items.append({
+            "kode": f"K{i + 1}", "fase": fase_of_idx[i], "minggu": w, "hari": None,
+            "target": (hpht + timedelta(weeks=w)).isoformat(),
+            "selesai": done is not None,
+            "tanggal": done["tanggal"] if done else None,
+        })
+    persalinan = date.fromisoformat(p["tanggal_persalinan"]) if p.get("tanggal_persalinan") else None
+    if persalinan:
+        for i, d in enumerate(KF_DAYS):
+            done = kf[i] if i < len(kf) else None
+            items.append({
+                "kode": f"KF{i + 1}", "fase": "nifas", "minggu": None, "hari": d,
+                "target": (persalinan + timedelta(days=d)).isoformat(),
+                "selesai": done is not None,
+                "tanggal": done["tanggal"] if done else None,
+            })
+    ringkasan = {}
+    for fase in ("trimester_1", "trimester_2", "trimester_3", "nifas"):
+        g = [i for i in items if i["fase"] == fase]
+        if not g:
+            continue
+        ke = sum(1 for i in g if i["selesai"])
+        ringkasan[fase] = {"ke": ke, "total": len(g), "lengkap": ke >= len(g)}
+    return {"items": items, "ringkasan": ringkasan}
+
+
+def serialize_patient(p: dict, checkups: list, imunisasi_done: Optional[list] = None) -> dict:
     usia_tahun = None
     if p.get("tanggal_lahir"):
         lahir = date.fromisoformat(p["tanggal_lahir"])
         today = date.today()
         usia_tahun = today.year - lahir.year - ((today.month, today.day) < (lahir.month, lahir.day))
     anc_total = sum(1 for c in checkups if c.get("jenis") == "anc")
+    rtl = next(
+        (c.get("rencana_tindak_lanjut") for c in sorted(checkups, key=lambda c: c["tanggal"], reverse=True) if c.get("rencana_tindak_lanjut")),
+        None,
+    )
+    imu_next = None
+    if p.get("tanggal_persalinan"):
+        done_kodes = {r["kode"] for r in (imunisasi_done or [])}
+        lahir_bayi = date.fromisoformat(p["tanggal_persalinan"])
+        for s in IMUNISASI_SCHEDULE:
+            if s["kode"] not in done_kodes:
+                imu_next = {**s, "tanggal": (lahir_bayi + timedelta(days=s["hari"])).isoformat()}
+                break
     return {
         "id": p["id"],
         "nama": p["nama"],
@@ -207,8 +309,18 @@ def serialize_patient(p: dict, checkups: list) -> dict:
         "penyakit_penyerta": p.get("penyakit_penyerta", ""),
         "keluhan_utama": p.get("keluhan_utama", ""),
         "riwayat": p.get("riwayat", ""),
+        "riwayat_kehamilan": p.get("riwayat_kehamilan", []),
         "catatan": p.get("catatan", ""),
         "tanggal_persalinan": p.get("tanggal_persalinan"),
+        "nama_anak": p.get("nama_anak", ""),
+        "jenis_kelamin_anak": p.get("jenis_kelamin_anak", ""),
+        "cara_lahir": p.get("cara_lahir", ""),
+        "tempat_lahir": p.get("tempat_lahir", ""),
+        "penolong_persalinan": p.get("penolong_persalinan", ""),
+        "masalah_persalinan": p.get("masalah_persalinan", ""),
+        "anc_lengkap": anc_total >= 6,
+        "rtl_berikutnya": rtl,
+        "imunisasi_berikutnya": imu_next,
         "kupon_eligible": anc_total > 5,
         "kupon_diklaim": p.get("kupon_diklaim", False),
         "created_at": p.get("created_at"),
@@ -218,7 +330,8 @@ def serialize_patient(p: dict, checkups: list) -> dict:
 
 async def patient_with_checkups(p: dict) -> dict:
     checks = await db.checkups.find({"patient_id": p["id"]}, {"_id": 0}).to_list(1000)
-    return serialize_patient(p, checks)
+    imu = await db.imunisasi.find({"patient_id": p["id"]}, {"_id": 0}).to_list(100)
+    return serialize_patient(p, checks, imu)
 
 
 # ---------- AUTH ----------
@@ -305,7 +418,8 @@ async def get_patient(patient_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
     checks = await db.checkups.find({"patient_id": patient_id}, {"_id": 0}).to_list(1000)
     checks.sort(key=lambda c: c["tanggal"])
-    return {"pasien": serialize_patient(p, checks), "checkups": checks}
+    imu = await db.imunisasi.find({"patient_id": patient_id}, {"_id": 0}).to_list(100)
+    return {"pasien": serialize_patient(p, checks, imu), "checkups": checks, "timeline": build_timeline(p, checks)}
 
 
 @api_router.put("/patients/{patient_id}")
@@ -339,7 +453,15 @@ async def set_persalinan(patient_id: str, data: DeliveryInput, user=Depends(get_
             raise HTTPException(status_code=400, detail="Tanggal persalinan tidak boleh di masa depan")
         if tgl < date.fromisoformat(p["hpht"]):
             raise HTTPException(status_code=400, detail="Tanggal persalinan tidak boleh sebelum HPHT")
-    await db.patients.update_one({"id": patient_id}, {"$set": {"tanggal_persalinan": data.tanggal_persalinan}})
+    await db.patients.update_one({"id": patient_id}, {"$set": {
+        "tanggal_persalinan": data.tanggal_persalinan,
+        "nama_anak": data.nama_anak or "",
+        "jenis_kelamin_anak": data.jenis_kelamin_anak or "",
+        "cara_lahir": data.cara_lahir or "",
+        "tempat_lahir": data.tempat_lahir or "",
+        "penolong_persalinan": data.penolong_persalinan or "",
+        "masalah_persalinan": data.masalah_persalinan or "",
+    }})
     p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     return await patient_with_checkups(p)
 
@@ -368,6 +490,10 @@ async def add_checkup(patient_id: str, data: CheckupInput, user=Depends(get_curr
         "djj": data.djj,
         "keluhan": data.keluhan or "",
         "catatan": data.catatan or "",
+        "rencana_tindak_lanjut": data.rencana_tindak_lanjut or "",
+        "jenis_kb": data.jenis_kb or "",
+        "kontrol_kb": bool(data.kontrol_kb),
+        "imunisasi_diberikan": data.imunisasi_diberikan or "",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.checkups.insert_one(doc)
@@ -386,6 +512,73 @@ async def delete_checkup(checkup_id: str, user=Depends(get_current_user)):
 @api_router.get("/")
 async def root():
     return {"message": "BidanKu API"}
+
+
+@api_router.get("/patients/{patient_id}/imunisasi")
+async def get_imunisasi(patient_id: str, user=Depends(get_current_user)):
+    p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    if not p.get("tanggal_persalinan"):
+        return {"usia_bayi_hari": None, "items": []}
+    lahir = date.fromisoformat(p["tanggal_persalinan"])
+    today = date.today()
+    records = await db.imunisasi.find({"patient_id": patient_id}, {"_id": 0}).to_list(100)
+    done_map = {r["kode"]: r for r in records}
+    items = []
+    for s in IMUNISASI_SCHEDULE:
+        target = lahir + timedelta(days=s["hari"])
+        rec = done_map.get(s["kode"])
+        if rec:
+            status = "selesai"
+        elif target < today - timedelta(days=7):
+            status = "terlambat"
+        elif target <= today:
+            status = "hari_ini"
+        elif (target - today).days <= 7:
+            status = "mendekati"
+        else:
+            status = "terjadwal"
+        items.append({**s, "tanggal_target": target.isoformat(), "status": status, "record": rec})
+    return {"usia_bayi_hari": (today - lahir).days, "items": items}
+
+
+@api_router.post("/patients/{patient_id}/imunisasi")
+async def add_imunisasi(patient_id: str, data: ImunisasiInput, user=Depends(get_current_user)):
+    p = await db.patients.find_one({"id": patient_id})
+    if not p:
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    if not p.get("tanggal_persalinan"):
+        raise HTTPException(status_code=400, detail="Catat tanggal persalinan dulu sebelum mengisi imunisasi")
+    sched = next((s for s in IMUNISASI_SCHEDULE if s["kode"] == data.kode), None)
+    if not sched:
+        raise HTTPException(status_code=400, detail="Kode imunisasi tidak dikenal")
+    existing = await db.imunisasi.find_one({"patient_id": patient_id, "kode": data.kode})
+    if existing:
+        raise HTTPException(status_code=400, detail="Imunisasi ini sudah tercatat")
+    tanggal = data.tanggal or date.today().isoformat()
+    if parse_date(tanggal, "tanggal imunisasi") > date.today():
+        raise HTTPException(status_code=400, detail="Tanggal imunisasi tidak boleh di masa depan")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "patient_id": patient_id,
+        "kode": data.kode,
+        "nama": sched["nama"],
+        "tanggal": tanggal,
+        "catatan": data.catatan or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.imunisasi.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/imunisasi/{record_id}")
+async def delete_imunisasi(record_id: str, user=Depends(get_current_user)):
+    result = await db.imunisasi.delete_one({"id": record_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Catatan imunisasi tidak ditemukan")
+    return {"ok": True}
 
 
 # ---------- KUPON PIJAT BAYI ----------
@@ -463,6 +656,7 @@ app.add_middleware(
 async def startup():
     await db.users.create_index("username", unique=True)
     await db.checkups.create_index("patient_id")
+    await db.imunisasi.create_index("patient_id")
     await db.login_attempts.create_index("username", unique=True)
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
     password = os.environ.get("ADMIN_PASSWORD", "admin123")

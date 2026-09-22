@@ -9,16 +9,27 @@ import { FaseBadge } from "./StatusBadge";
 export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages }) {
   const [patients, setPatients] = useState(null);
   const [text, setText] = useState("");
+  const [selected, setSelected] = useState([]);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (open) {
       setPatients(null);
       api.get("/patients").then((r) => setPatients(r.data));
-      setText(messages.map((m, i) => `${i + 1}. ${m.isi}`).join("\n\n"));
+      setSelected(messages.map((m) => m.id));
       setCopied(false);
     }
   }, [open, fase, messages]);
+
+  useEffect(() => {
+    if (open) {
+      setText(messages.filter((m) => selected.includes(m.id)).map((m, i) => `${i + 1}. ${m.isi}`).join("\n\n"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  const toggleMsg = (id) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   const recipients = useMemo(() => {
     if (!patients) return [];
@@ -51,9 +62,31 @@ export default function EdukasiBlast({ open, onClose, fase, faseLabel, messages 
   return (
     <Modal open={open} onClose={onClose} title={`Kirim Edukasi ${faseLabel} ke WhatsApp`} testid="edukasi-blast-modal">
       <div className="space-y-4">
+        <div className="border border-slate-200 rounded-xl p-3 max-h-44 overflow-y-auto">
+          <div className="text-xs font-semibold text-slate-600 mb-2">
+            Pilih materi yang akan dikirim ({selected.length}/{messages.length})
+          </div>
+          {messages.length === 0 ? (
+            <p className="text-xs text-slate-400">Chatbox fase ini masih kosong — tulis manual di kotak pesan bawah.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {messages.map((m) => (
+                <label key={m.id} className="flex items-start gap-2 cursor-pointer" data-testid={`blast-msg-${m.id}`}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(m.id)}
+                    onChange={() => toggleMsg(m.id)}
+                    className="mt-1 accent-[#C02650]"
+                  />
+                  <span className="text-sm text-slate-700 line-clamp-2">{m.isi}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold text-slate-600">Pesan Edukasi (gabungan chatbox, bisa diedit)</label>
+            <label className="text-xs font-semibold text-slate-600">Pesan Edukasi (gabungan materi terpilih, bisa diedit)</label>
             <button
               data-testid="edukasi-blast-copy"
               onClick={copy}
