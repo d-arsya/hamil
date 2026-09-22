@@ -92,6 +92,11 @@ class LoginInput(BaseModel):
     password: str
 
 
+class ChangePasswordInput(BaseModel):
+    password_lama: str
+    password_baru: str
+
+
 class RiwayatItem(BaseModel):
     tahun: Optional[str] = ""
     tempat: Optional[str] = ""
@@ -368,6 +373,17 @@ async def login(data: LoginInput):
 @api_router.get("/auth/me")
 async def me(user=Depends(get_current_user)):
     return {"username": user["username"], "nama": user.get("nama", ""), "email": user.get("email", "")}
+
+
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePasswordInput, user=Depends(get_current_user)):
+    if len(data.password_baru) < 8:
+        raise HTTPException(status_code=400, detail="Password baru minimal 8 karakter")
+    row = await db.users.find_one({"id": user["id"]})
+    if not row or not verify_password(data.password_lama, row["password_hash"]):
+        raise HTTPException(status_code=400, detail="Password lama salah")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": hash_password(data.password_baru)}})
+    return {"ok": True}
 
 
 # ---------- DASHBOARD ----------
@@ -847,9 +863,6 @@ async def startup():
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
         logger.info("Admin user seeded: %s", username)
-    elif not verify_password(password, existing["password_hash"]):
-        await db.users.update_one({"username": username}, {"$set": {"password_hash": hash_password(password)}})
-        logger.info("Admin password re-synced: %s", username)
 
 
 @app.on_event("shutdown")

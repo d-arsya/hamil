@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Menu, X, LogOut, HeartPulse, BookOpen, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Users, Menu, X, LogOut, HeartPulse, BookOpen, BarChart3, KeyRound } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import api, { apiError } from "../lib/api";
+import Modal from "./Modal";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
@@ -14,6 +17,9 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ lama: "", baru: "", konfirmasi: "" });
+  const [pwSaving, setPwSaving] = useState(false);
   const today = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -24,6 +30,28 @@ export default function Layout() {
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const submitPassword = async () => {
+    if (!pwForm.lama || !pwForm.baru) {
+      toast.error("Isi password lama dan baru");
+      return;
+    }
+    if (pwForm.baru !== pwForm.konfirmasi) {
+      toast.error("Konfirmasi password baru tidak sama");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await api.post("/auth/change-password", { password_lama: pwForm.lama, password_baru: pwForm.baru });
+      toast.success("Password berhasil diganti");
+      setPwOpen(false);
+      setPwForm({ lama: "", baru: "", konfirmasi: "" });
+    } catch (err) {
+      toast.error(apiError(err, "Gagal mengganti password"));
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   const sidebar = (suffix = "") => (
@@ -67,6 +95,14 @@ export default function Layout() {
           </div>
         </div>
         <button
+          data-testid={`change-password-button${suffix}`}
+          onClick={() => setPwOpen(true)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-[#C02650] transition-colors mb-2"
+        >
+          <KeyRound className="w-4 h-4" />
+          Ganti Password
+        </button>
+        <button
           data-testid={`logout-button${suffix}`}
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-red-600 transition-colors"
@@ -104,6 +140,52 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <Modal open={pwOpen} onClose={() => setPwOpen(false)} title="Ganti Password" testid="change-password-modal">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Password Lama</label>
+            <input
+              data-testid="pw-old-input"
+              type="password"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
+              value={pwForm.lama}
+              onChange={(e) => setPwForm((f) => ({ ...f, lama: e.target.value }))}
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Password Baru (min. 8 karakter)</label>
+            <input
+              data-testid="pw-new-input"
+              type="password"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
+              value={pwForm.baru}
+              onChange={(e) => setPwForm((f) => ({ ...f, baru: e.target.value }))}
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Konfirmasi Password Baru</label>
+            <input
+              data-testid="pw-confirm-input"
+              type="password"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C02650]/30 focus:border-[#C02650] transition-colors"
+              value={pwForm.konfirmasi}
+              onChange={(e) => setPwForm((f) => ({ ...f, konfirmasi: e.target.value }))}
+              autoComplete="new-password"
+            />
+          </div>
+          <button
+            data-testid="pw-submit-button"
+            onClick={submitPassword}
+            disabled={pwSaving}
+            className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#C02650] text-white hover:bg-[#A01B40] transition-colors disabled:opacity-60"
+          >
+            {pwSaving ? "Menyimpan..." : "Simpan Password Baru"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

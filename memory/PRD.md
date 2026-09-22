@@ -70,6 +70,10 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 3. Template WA tersinkron satu koleksi /api/templates — dipakai modal WA pasien & modal edukasi
 4. Menu Laporan baru (/laporan): ketuntasan per K1-K6 & KF1-KF4 (bar %), tuntas vs lost to follow up, persentase penyakit penyerta & penyulit tertinggi — endpoint GET /api/laporan
 
+## Iterasi 8 (Sept 2026) — Security audit & hardening
+- Audit keamanan: 1 CRITICAL (password admin default admin123 yang pulih-sendiri tiap restart) → DIPERBAIKI: password kuat di env, logika re-sync password dihapus (password tidak lagi ke-reset saat restart), endpoint POST /api/auth/change-password + tombol "Ganti Password" di sidebar
+- Catatan audit lain (P3, diterima untuk MVP single-tenant): JWT di localStorage, CORS wildcard (auth via header bukan cookie), N+1 query, JWT_SECRET di .env (disarankan rotasi & jangan commit ke repo publik)
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)
