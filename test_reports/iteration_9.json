@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 9 verified end-to-end. Three new features validated: (1) No. RM field in PatientForm (patient-form-no-rm) — saves & persists via POST/PUT /api/patients, shown in Patients list ('RM xxx') and in PatientDetail InfoItem. (2) Six TTV fields in CheckupForm (spo2/suhu/nadi/rr/lila/tb) — saved via POST /api/patients/{id}/checkups and rendered in the TD/TTV column of Riwayat Kontrol as 'SpO2 98% · 36.6°C · N 82 · RR 19 · LiLa 26.5 · TB 155'. (3) Imunisasi TT panel (imunisasi-tt-panel) with 5 rows tt1..tt5 — TT1 target=tanggal pendaftaran, tt2..5 initially 'Menunggu Dosis Sebelumnya'; marking TT1 selesai sets tt2 target to TT1+28 days (status becomes 'Terjadwal'); duplicate returns 400; DELETE reverts tt2 back to 'Menunggu'. Full backend regression: 108/108 pytest tests pass (95 legacy + 13 new). All fase != nifas patients see the TT panel; nifas patient (Dewi Lestari) does not render it (verified via conditional in PatientDetail.jsx:340).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration9.py",
+    "/app/test_reports/pytest/iteration_9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:807 — TT1 target uses date.fromisoformat(p['created_at'][:10]) which is UTC-timestamp based; edge-case bug: for admin creating a patient near midnight WIB the ISO date can be one day off from the local registration date. Consider storing a plain YYYY-MM-DD 'tanggal_daftar' on the patient doc instead of slicing created_at.",
+    "server.py:820 — 'terlambat' branch uses today - 7 days threshold; behavior differs from other overdue definitions in the app (which use 'today > jadwal' immediately). Minor consistency point; consider documenting the 7-day grace explicitly.",
+    "server.py:790-796 — TT_SCHEDULE is a module-level list used by multiple endpoints; fine, but consider freezing (tuple/typing.Final) to prevent accidental mutation.",
+    "PatientDetail.jsx:340 — TT panel visibility is gated by 'p.fase !== \"nifas\"'; requirement is 'ibu hamil' but this also renders the panel for a patient who has not yet delivered but is technically finished with all trimesters. Acceptable per requirement wording, but confirm with product.",
+    "ImunisasiTTPanel.jsx:38 — Uses window.confirm() for delete instead of the styled ConfirmDialog used elsewhere in the app (persalinan/edit). Minor UX inconsistency.",
+    "CheckupForm.jsx:21 — 'ke' field initialised from regex on kunjungan_berikutnya; if the string ever comes back malformed the value silently becomes '1'. Safe but log-worthy on invalid parse.",
+    "server.py PatientInput — no validation on no_rm length/charset. Consider stripping and length limit (e.g., 32 chars) to prevent noisy data."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration9.py (new — 13 tests covering No. RM, TTV, and Imunisasi TT flows incl. duplicate/delete/future-date/invalid-kode)"
+  ],
+  "success_rate": {"backend": "100% (108/108)", "frontend": "100% (all critical selectors and integrations verified)"},
+  "test_credentials": "admin / Bidan#Aman2026xY9 (read via conftest.py from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Ephemeral TEST_iter9_* and TEST_iter9tt_* patients created and deleted via fixtures. One TEST_UI_* patient created + deleted from UI. No production/seed data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 9 features (No. RM, 6 TTV fields, Imunisasi TT tt1..tt5) fully working end-to-end. Backend has 108 tests total; run with: `export REACT_APP_BACKEND_URL=https://antenatal-postnatal.preview.emergentagent.com && pytest /app/backend/tests/ -v -n 0`. Note: iteration_2 lockout tests may affect subsequent auth flows — those tests already clean up login_attempts collection but a manual `mongosh test_database --eval 'db.login_attempts.deleteMany({})'` can be run if login fails. Password unchanged (Bidan#Aman2026xY9)."
+}

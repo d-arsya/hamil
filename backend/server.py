@@ -85,6 +85,8 @@ def validate_patient_dates(hpht: str, tanggal_lahir: Optional[str] = None):
 def validate_gpa(data):
     if data.gravida < 1 or data.para < 0 or data.abortus < 0:
         raise HTTPException(status_code=400, detail="Nilai G/P/A tidak valid (Gravida minimal 1, lainnya minimal 0)")
+    if data.no_rm and len(data.no_rm.strip()) > 32:
+        raise HTTPException(status_code=400, detail="Nomor RM maksimal 32 karakter")
 
 
 class LoginInput(BaseModel):
