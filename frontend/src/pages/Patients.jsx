@@ -152,6 +152,7 @@ export default function Patients() {
                       <RiskBadges penyakit={p.penyakit_penyerta} testidPrefix={`risk-${p.id}`} />
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">
+                      {p.no_rm ? <span className="font-mono font-semibold">RM {p.no_rm} · </span> : ""}
                       {p.usia_tahun != null ? `${p.usia_tahun} th · ` : ""}G{p.gravida} P{p.para} A{p.abortus}
                     </div>
                   </td>

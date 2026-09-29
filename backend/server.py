@@ -108,6 +108,7 @@ class RiwayatItem(BaseModel):
 
 class PatientInput(BaseModel):
     nama: str
+    no_rm: Optional[str] = ""
     no_wa: str
     alamat: Optional[str] = ""
     tanggal_lahir: Optional[str] = None
@@ -137,6 +138,12 @@ class CheckupInput(BaseModel):
     imunisasi_diberikan: Optional[str] = ""
     jenis: Optional[str] = None
     ke: Optional[int] = None
+    spo2: Optional[int] = None
+    suhu: Optional[float] = None
+    nadi: Optional[int] = None
+    rr: Optional[int] = None
+    lila: Optional[float] = None
+    tinggi_badan: Optional[float] = None
 
 
 class DeliveryInput(BaseModel):
@@ -310,6 +317,7 @@ def serialize_patient(p: dict, checkups: list, imunisasi_done: Optional[list] = 
     return {
         "id": p["id"],
         "nama": p["nama"],
+        "no_rm": p.get("no_rm", ""),
         "no_wa": p["no_wa"],
         "alamat": p.get("alamat", ""),
         "tanggal_lahir": p.get("tanggal_lahir"),
@@ -527,6 +535,12 @@ async def add_checkup(patient_id: str, data: CheckupInput, user=Depends(get_curr
         "jenis_kb": data.jenis_kb or "",
         "kontrol_kb": bool(data.kontrol_kb),
         "imunisasi_diberikan": data.imunisasi_diberikan or "",
+        "spo2": data.spo2,
+        "suhu": data.suhu,
+        "nadi": data.nadi,
+        "rr": data.rr,
+        "lila": data.lila,
+        "tinggi_badan": data.tinggi_badan,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.checkups.insert_one(doc)
@@ -772,6 +786,85 @@ async def laporan(user=Depends(get_current_user)):
     }
 
 
+# ---------- IMUNISASI TT IBU HAMIL (jadwal Kemenkes) ----------
+TT_SCHEDULE = [
+    {"kode": "tt1", "nama": "TT 1", "dari": None, "interval_hari": 0, "ket": "kontak pertama / pendaftaran"},
+    {"kode": "tt2", "nama": "TT 2", "dari": "tt1", "interval_hari": 28, "ket": "4 minggu setelah TT 1"},
+    {"kode": "tt3", "nama": "TT 3", "dari": "tt2", "interval_hari": 182, "ket": "6 bulan setelah TT 2"},
+    {"kode": "tt4", "nama": "TT 4", "dari": "tt3", "interval_hari": 365, "ket": "1 tahun setelah TT 3"},
+    {"kode": "tt5", "nama": "TT 5", "dari": "tt4", "interval_hari": 365, "ket": "1 tahun setelah TT 4"},
+]
+
+
+@api_router.get("/patients/{patient_id}/imunisasi-tt")
+async def get_imunisasi_tt(patient_id: str, user=Depends(get_current_user)):
+    p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    today = date.today()
+    records = await db.imunisasi_tt.find({"patient_id": patient_id}, {"_id": 0}).to_list(20)
+    done_map = {r["kode"]: r for r in records}
+    daftar = date.fromisoformat(p["created_at"][:10]) if p.get("created_at") else today
+    items = []
+    for s in TT_SCHEDULE:
+        rec = done_map.get(s["kode"])
+        if s["dari"] is None:
+            target = daftar
+        else:
+            prev = done_map.get(s["dari"])
+            target = (date.fromisoformat(prev["tanggal"]) + timedelta(days=s["interval_hari"])) if prev else None
+        if rec:
+            status = "selesai"
+        elif target is None:
+            status = "menunggu"
+        elif target < today - timedelta(days=7):
+            status = "terlambat"
+        elif target <= today:
+            status = "hari_ini"
+        elif (target - today).days <= 7:
+            status = "mendekati"
+        else:
+            status = "terjadwal"
+        items.append({**s, "tanggal_target": target.isoformat() if target else None, "status": status, "record": rec})
+    return {"items": items}
+
+
+@api_router.post("/patients/{patient_id}/imunisasi-tt")
+async def add_imunisasi_tt(patient_id: str, data: ImunisasiInput, user=Depends(get_current_user)):
+    p = await db.patients.find_one({"id": patient_id})
+    if not p:
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    sched = next((s for s in TT_SCHEDULE if s["kode"] == data.kode), None)
+    if not sched:
+        raise HTTPException(status_code=400, detail="Kode imunisasi TT tidak dikenal")
+    existing = await db.imunisasi_tt.find_one({"patient_id": patient_id, "kode": data.kode})
+    if existing:
+        raise HTTPException(status_code=400, detail=f"{sched['nama']} sudah tercatat")
+    tanggal = data.tanggal or date.today().isoformat()
+    if parse_date(tanggal, "tanggal imunisasi") > date.today():
+        raise HTTPException(status_code=400, detail="Tanggal imunisasi tidak boleh di masa depan")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "patient_id": patient_id,
+        "kode": data.kode,
+        "nama": sched["nama"],
+        "tanggal": tanggal,
+        "catatan": data.catatan or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.imunisasi_tt.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/imunisasi-tt/{record_id}")
+async def delete_imunisasi_tt(record_id: str, user=Depends(get_current_user)):
+    result = await db.imunisasi_tt.delete_one({"id": record_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Catatan imunisasi TT tidak ditemukan")
+    return {"ok": True}
+
+
 # ---------- KUPON PIJAT BAYI ----------
 class KuponInput(BaseModel):
     diklaim: bool
@@ -848,6 +941,7 @@ async def startup():
     await db.users.create_index("username", unique=True)
     await db.checkups.create_index("patient_id")
     await db.imunisasi.create_index("patient_id")
+    await db.imunisasi_tt.create_index("patient_id")
     await db.login_attempts.create_index("username", unique=True)
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
     password = os.environ["ADMIN_PASSWORD"]

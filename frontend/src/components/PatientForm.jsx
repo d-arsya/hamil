@@ -5,6 +5,7 @@ import Modal from "./Modal";
 
 const empty = {
   nama: "",
+  no_rm: "",
   no_wa: "",
   alamat: "",
   tanggal_lahir: "",
@@ -98,9 +99,14 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
         <Field label="Nama Lengkap *">
           <input data-testid="patient-form-nama" className={inputCls} value={form.nama} onChange={set("nama")} placeholder="cth: Siti Rahmawati" />
         </Field>
-        <Field label="No. WhatsApp *" hint="Format 08xx atau 628xx">
-          <input data-testid="patient-form-wa" className={inputCls} value={form.no_wa} onChange={set("no_wa")} placeholder="cth: 081234567890" />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="No. RM (Rekam Medis)">
+            <input data-testid="patient-form-no-rm" className={inputCls} value={form.no_rm} onChange={set("no_rm")} placeholder="cth: 001245" />
+          </Field>
+          <Field label="No. WhatsApp *" hint="Format 08xx atau 628xx">
+            <input data-testid="patient-form-wa" className={inputCls} value={form.no_wa} onChange={set("no_wa")} placeholder="cth: 081234567890" />
+          </Field>
+        </div>
         <Field label="Alamat">
           <textarea data-testid="patient-form-alamat" className={inputCls} rows={2} value={form.alamat} onChange={set("alamat")} placeholder="Alamat tempat tinggal" />
         </Field>

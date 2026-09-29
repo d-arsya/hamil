@@ -18,7 +18,7 @@ function Field({ label, hint, children }) {
 
 export default function CheckupForm({ open, onClose, onSaved, patient }) {
   const today = new Date().toISOString().slice(0, 10);
-  const empty = { tanggal: today, jenis: "anc", sistolik: "", diastolik: "", berat_badan: "", tinggi_fundus: "", djj: "", keluhan: "", catatan: "", rencana_tindak_lanjut: "", jenis_kb: "", kontrol_kb: false, imunisasi_diberikan: "" };
+  const empty = { tanggal: today, jenis: "anc", sistolik: "", diastolik: "", spo2: "", suhu: "", nadi: "", rr: "", lila: "", tinggi_badan: "", berat_badan: "", tinggi_fundus: "", djj: "", keluhan: "", catatan: "", rencana_tindak_lanjut: "", jenis_kb: "", kontrol_kb: false, imunisasi_diberikan: "" };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
@@ -49,6 +49,12 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
         rencana_tindak_lanjut: form.rencana_tindak_lanjut,
         jenis: form.jenis,
         ke: parseInt(form.ke) || null,
+        spo2: num(form.spo2),
+        suhu: num(form.suhu),
+        nadi: num(form.nadi),
+        rr: num(form.rr),
+        lila: num(form.lila),
+        tinggi_badan: num(form.tinggi_badan),
         jenis_kb: form.jenis === "kf" ? form.jenis_kb : "",
         kontrol_kb: form.jenis === "kf" ? form.kontrol_kb : false,
         imunisasi_diberikan: form.jenis === "kf" ? form.imunisasi_diberikan : "",
@@ -90,6 +96,28 @@ export default function CheckupForm({ open, onClose, onSaved, patient }) {
           </Field>
           <Field label="TD Diastolik (mmHg)">
             <input data-testid="checkup-form-diastolik" type="number" className={inputCls} value={form.diastolik} onChange={set("diastolik")} placeholder="cth: 70" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="SpO2 (%)">
+            <input data-testid="checkup-form-spo2" type="number" className={inputCls} value={form.spo2} onChange={set("spo2")} placeholder="cth: 98" />
+          </Field>
+          <Field label="Suhu (°C)">
+            <input data-testid="checkup-form-suhu" type="number" step="0.1" className={inputCls} value={form.suhu} onChange={set("suhu")} placeholder="cth: 36.5" />
+          </Field>
+          <Field label="Nadi (x/mnt)">
+            <input data-testid="checkup-form-nadi" type="number" className={inputCls} value={form.nadi} onChange={set("nadi")} placeholder="cth: 80" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="RR (x/mnt)">
+            <input data-testid="checkup-form-rr" type="number" className={inputCls} value={form.rr} onChange={set("rr")} placeholder="cth: 20" />
+          </Field>
+          <Field label="LiLa (cm)">
+            <input data-testid="checkup-form-lila" type="number" step="0.1" className={inputCls} value={form.lila} onChange={set("lila")} placeholder="cth: 25.5" />
+          </Field>
+          <Field label="Tinggi Badan (cm)">
+            <input data-testid="checkup-form-tb" type="number" step="0.1" className={inputCls} value={form.tinggi_badan} onChange={set("tinggi_badan")} placeholder="cth: 155" />
           </Field>
         </div>
         <div className="grid grid-cols-3 gap-3">

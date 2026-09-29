@@ -74,6 +74,11 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Audit keamanan: 1 CRITICAL (password admin default admin123 yang pulih-sendiri tiap restart) → DIPERBAIKI: password kuat di env, logika re-sync password dihapus (password tidak lagi ke-reset saat restart), endpoint POST /api/auth/change-password + tombol "Ganti Password" di sidebar
 - Catatan audit lain (P3, diterima untuk MVP single-tenant): JWT di localStorage, CORS wildcard (auth via header bukan cookie), N+1 query, JWT_SECRET di .env (disarankan rotasi & jangan commit ke repo publik)
 
+## Iterasi 9 (Sept 2026)
+- No. RM (rekam medis) pasien: field form, tampil di daftar & detail
+- TTV lengkap di catat kontrol: SpO2, suhu, nadi, RR, LiLa, tinggi badan (tanpa grafik), tampil ringkas di kolom TD/TTV tabel riwayat
+- Checklist imunisasi TT ibu hamil (TT1-TT5, interval Kemenkes: TT2=4 mgg pasca TT1, TT3=6 bln, TT4/TT5=1 th) — ImunisasiTTPanel.jsx + /api/patients/{id}/imunisasi-tt, target dihitung dari tanggal dosis sebelumnya
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

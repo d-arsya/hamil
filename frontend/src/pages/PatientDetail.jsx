@@ -12,6 +12,7 @@ import CheckupForm from "../components/CheckupForm";
 import WaReminder from "../components/WaReminder";
 import Timeline from "../components/Timeline";
 import ImunisasiPanel from "../components/ImunisasiPanel";
+import ImunisasiTTPanel from "../components/ImunisasiTTPanel";
 import Modal from "../components/Modal";
 import { useAuth } from "../context/AuthContext";
 import { fmtDate, usiaLabel } from "../lib/utils-id";
@@ -232,6 +233,7 @@ export default function PatientDetail() {
         <div className={cardCls}>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Data Pasien</h3>
           <div className="grid grid-cols-2 gap-4">
+            <InfoItem label="No. RM" value={p.no_rm} />
             <InfoItem label="Usia" value={p.usia_tahun != null ? `${p.usia_tahun} tahun` : "-"} />
             <InfoItem label="No. WhatsApp" value={p.no_wa} />
             <InfoItem label="Alamat" value={p.alamat} />
@@ -335,6 +337,7 @@ export default function PatientDetail() {
       </div>
 
       <ImunisasiPanel patient={p} onRemind={() => { setWaTemplate("imunisasi"); setWaOpen(true); }} />
+      {p.fase !== "nifas" && <ImunisasiTTPanel patient={p} />}
 
       <div className="bg-white rounded-xl border border-slate-200/80 overflow-x-auto">
         <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-2.5">
@@ -354,7 +357,7 @@ export default function PatientDetail() {
               <tr className="border-b border-slate-100 text-left">
                 <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
                 <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunjungan</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">TD (mmHg)</th>
+                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">TD / TTV</th>
                 <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">BB (kg)</th>
                 <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">TFU (cm)</th>
                 <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">DJJ</th>
@@ -372,7 +375,21 @@ export default function PatientDetail() {
                       {c.jenis === "kf" ? `KF${c.ke}` : `K${c.ke}`}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-slate-600">{c.sistolik && c.diastolik ? `${c.sistolik}/${c.diastolik}` : "-"}</td>
+                  <td className="px-5 py-3 text-slate-600">
+                    <div>{c.sistolik && c.diastolik ? `${c.sistolik}/${c.diastolik}` : "-"}</div>
+                    {(c.spo2 || c.suhu || c.nadi || c.rr || c.lila || c.tinggi_badan) && (
+                      <div className="text-[10px] text-slate-400 leading-relaxed">
+                        {[
+                          c.spo2 != null && `SpO2 ${c.spo2}%`,
+                          c.suhu != null && `${c.suhu}°C`,
+                          c.nadi != null && `N ${c.nadi}`,
+                          c.rr != null && `RR ${c.rr}`,
+                          c.lila != null && `LiLa ${c.lila}`,
+                          c.tinggi_badan != null && `TB ${c.tinggi_badan}`,
+                        ].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-slate-600">{c.berat_badan ?? "-"}</td>
                   <td className="px-5 py-3 text-slate-600">{c.tinggi_fundus ?? "-"}</td>
                   <td className="px-5 py-3 text-slate-600">{c.djj ?? "-"}</td>
