@@ -13,7 +13,7 @@ pasienApi.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 || err.response?.status === 403) {
       localStorage.removeItem("pasien_token");
-      if (!window.location.pathname.startsWith("/pasien/login")) window.location.href = "/pasien/login";
+      if (!window.location.pathname.startsWith("/ibu/login")) window.location.href = "/ibu/login";
     }
     return Promise.reject(err);
   }

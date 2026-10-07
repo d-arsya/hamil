@@ -8,21 +8,21 @@ import Onboarding from "./Onboarding";
 export const usePasien = () => useOutletContext();
 
 const NAV = [
-  { to: "/pasien", label: "Beranda", icon: Home, end: true },
-  { to: "/pasien/pantau", label: "Pantau", icon: Activity },
-  { to: "/pasien/ttd", label: "TTD", icon: Pill },
-  { to: "/pasien/gerakan", label: "Bayi", icon: Baby },
-  { to: "/pasien/pengaturan", label: "Lainnya", icon: MenuIcon },
+  { to: "/ibu", label: "Beranda", icon: Home, end: true },
+  { to: "/ibu/pantau", label: "Pantau", icon: Activity },
+  { to: "/ibu/ttd", label: "TTD", icon: Pill },
+  { to: "/ibu/gerakan", label: "Bayi", icon: Baby },
+  { to: "/ibu/pengaturan", label: "Lainnya", icon: MenuIcon },
 ];
 
 export default function PasienLayout() {
   const [me, setMe] = useState(null);
   const navigate = useNavigate();
 
-  const load = () => pasienApi.get("/pasien/me").then((r) => setMe(r.data)).catch(() => {});
+  const load = () => pasienApi.get("/ibu/me").then((r) => setMe(r.data)).catch(() => {});
   useEffect(() => {
     if (!localStorage.getItem("pasien_token")) {
-      navigate("/pasien/login");
+      navigate("/ibu/login");
       return;
     }
     load();

@@ -18,7 +18,7 @@ export default function PasienLogin() {
     try {
       const { data } = await pasienApi.post("/pasien/login", { username, password });
       localStorage.setItem("pasien_token", data.token);
-      navigate("/pasien");
+      navigate("/ibu");
     } catch (err) {
       setError(pasienError(err, "Login gagal"));
     } finally {

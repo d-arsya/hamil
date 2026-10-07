@@ -18,9 +18,9 @@ export default function Beranda() {
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
-    pasienApi.get("/pasien/ttd").then((r) => setTtdToday(r.data.find((t) => t.tanggal === today) || null)).catch(() => {});
-    pasienApi.get("/pasien/pemantauan?limit=1").then((r) => setPantauToday(r.data.find((x) => x.tanggal === today) || null)).catch(() => {});
-    pasienApi.get("/pasien/edukasi-klinik").then((r) => setPesan(r.data.pesan.slice(-3))).catch(() => {});
+    pasienApi.get("/ibu/ttd").then((r) => setTtdToday(r.data.find((t) => t.tanggal === today) || null)).catch(() => {});
+    pasienApi.get("/ibu/pemantauan?limit=1").then((r) => setPantauToday(r.data.find((x) => x.tanggal === today) || null)).catch(() => {});
+    pasienApi.get("/ibu/edukasi-klinik").then((r) => setPesan(r.data.pesan.slice(-3))).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -31,9 +31,9 @@ export default function Beranda() {
   const bisaGerakan = minggu >= 24 && p.fase !== "nifas";
 
   const todos = [
-    { label: "Minum TTD/MMS", done: ttdToday?.status === "sudah", to: "/pasien/ttd", show: true },
-    { label: "Isi pemantauan hari ini", done: Boolean(pantauToday), to: "/pasien/pantau", show: true },
-    { label: "Pantau gerakan bayi", done: false, to: "/pasien/gerakan", show: bisaGerakan },
+    { label: "Minum TTD/MMS", done: ttdToday?.status === "sudah", to: "/ibu/ttd", show: true },
+    { label: "Isi pemantauan hari ini", done: Boolean(pantauToday), to: "/ibu/pantau", show: true },
+    { label: "Pantau gerakan bayi", done: false, to: "/ibu/gerakan", show: bisaGerakan },
   ].filter((t) => t.show);
 
   const artikel = [EDUKASI_ARTIKEL.ttd[0], EDUKASI_ARTIKEL.bahaya[0], ...(bisaGerakan ? [EDUKASI_ARTIKEL.bayi[0]] : []), EDUKASI_ARTIKEL.mental[0], EDUKASI_ARTIKEL.pemeriksaan[0]];
@@ -68,7 +68,7 @@ export default function Beranda() {
       </div>
 
       {p.jadwal_berikutnya && p.selisih_hari != null && p.selisih_hari <= 7 && (
-        <Link to="/pasien/perjalanan" data-testid="beranda-pengingat-kontrol" className={`flex items-center gap-3 ${card} !py-4 ${p.selisih_hari < 0 ? "!border-red-300 !bg-red-50" : "!border-amber-200 !bg-amber-50"}`}>
+        <Link to="/ibu/perjalanan" data-testid="beranda-pengingat-kontrol" className={`flex items-center gap-3 ${card} !py-4 ${p.selisih_hari < 0 ? "!border-red-300 !bg-red-50" : "!border-amber-200 !bg-amber-50"}`}>
           <CalendarClock className={`w-6 h-6 shrink-0 ${p.selisih_hari < 0 ? "text-red-600" : "text-amber-600"}`} />
           <div className="text-sm">
             <b>{p.selisih_hari < 0 ? `Kontrol terlambat ${-p.selisih_hari} hari!` : p.selisih_hari === 0 ? "Jadwal kontrol HARI INI" : `Kontrol ${p.selisih_hari} hari lagi`}</b>
@@ -79,10 +79,10 @@ export default function Beranda() {
 
       <div className="grid grid-cols-4 gap-2">
         {[
-          { to: "/pasien/pantau", icon: Activity, label: "Pantau", testid: "qa-pantau" },
-          { to: "/pasien/ttd", icon: Pill, label: "TTD/MMS", testid: "qa-ttd" },
-          { to: "/pasien/gerakan", icon: Baby, label: "Gerakan", testid: "qa-gerakan" },
-          { to: "/pasien/bahaya", icon: AlertTriangle, label: "Bahaya", testid: "qa-bahaya" },
+          { to: "/ibu/pantau", icon: Activity, label: "Pantau", testid: "qa-pantau" },
+          { to: "/ibu/ttd", icon: Pill, label: "TTD/MMS", testid: "qa-ttd" },
+          { to: "/ibu/gerakan", icon: Baby, label: "Gerakan", testid: "qa-gerakan" },
+          { to: "/ibu/bahaya", icon: AlertTriangle, label: "Bahaya", testid: "qa-bahaya" },
         ].map(({ to, icon: Icon, label, testid }) => (
           <Link key={to} to={to} data-testid={testid} className="flex flex-col items-center gap-1.5 bg-white rounded-2xl border border-slate-200/80 py-4 active:scale-95 transition-transform">
             <div className="w-10 h-10 rounded-2xl bg-[#FDF2F5] flex items-center justify-center">
@@ -127,7 +127,7 @@ export default function Beranda() {
             </div>
           ))}
         </div>
-        <Link to="/pasien/edukasi" data-testid="beranda-edukasi-link" className="block text-center text-xs font-bold text-[#C02650] mt-3 hover:underline">
+        <Link to="/ibu/edukasi" data-testid="beranda-edukasi-link" className="block text-center text-xs font-bold text-[#C02650] mt-3 hover:underline">
           Lihat semua edukasi →
         </Link>
       </div>

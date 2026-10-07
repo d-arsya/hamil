@@ -6,12 +6,12 @@ import pasienApi from "../../lib/pasienApi";
 import { usePasien } from "./PasienLayout";
 
 const MENU = [
-  { to: "/pasien/mingguan", icon: ClipboardList, label: "Pemantauan Mingguan", desc: "Checklist mingguan Buku KIA" },
-  { to: "/pasien/bahaya", icon: AlertTriangle, label: "Tanda Bahaya", desc: "Kenali tanda bahaya kehamilan" },
-  { to: "/pasien/persiapan", icon: Baby, label: "Persiapan Persalinan", desc: "Checklist persiapan melahirkan" },
-  { to: "/pasien/perjalanan", icon: Route, label: "Perjalanan Kehamilan", desc: "Timeline kontrol dari klinik" },
-  { to: "/pasien/edukasi", icon: CalendarHeart, label: "Edukasi", desc: "Tips sehat untuk Ibu" },
-  { to: "/pasien/riwayat", icon: History, label: "Riwayat Saya", desc: "Semua catatan pemantauan" },
+  { to: "/ibu/mingguan", icon: ClipboardList, label: "Pemantauan Mingguan", desc: "Checklist mingguan Buku KIA" },
+  { to: "/ibu/bahaya", icon: AlertTriangle, label: "Tanda Bahaya", desc: "Kenali tanda bahaya kehamilan" },
+  { to: "/ibu/persiapan", icon: Baby, label: "Persiapan Persalinan", desc: "Checklist persiapan melahirkan" },
+  { to: "/ibu/perjalanan", icon: Route, label: "Perjalanan Kehamilan", desc: "Timeline kontrol dari klinik" },
+  { to: "/ibu/edukasi", icon: CalendarHeart, label: "Edukasi", desc: "Tips sehat untuk Ibu" },
+  { to: "/ibu/riwayat", icon: History, label: "Riwayat Saya", desc: "Semua catatan pemantauan" },
 ];
 
 const REMINDERS = [
@@ -29,19 +29,19 @@ export default function Pengaturan() {
   const p = me.pasien;
 
   useEffect(() => {
-    pasienApi.get("/pasien/pengingat").then((r) => setReminders(r.data)).catch(() => {});
+    pasienApi.get("/ibu/pengingat").then((r) => setReminders(r.data)).catch(() => {});
   }, []);
 
   const toggleReminder = async (k) => {
     const next = { ...reminders, [k]: !reminders[k] };
     setReminders(next);
-    await pasienApi.put("/pasien/pengingat", { items: next });
+    await pasienApi.put("/ibu/pengingat", { items: next });
     toast.success("Pengingat diperbarui");
   };
 
   const logout = () => {
     localStorage.removeItem("pasien_token");
-    navigate("/pasien/login");
+    navigate("/ibu/login");
   };
 
   return (

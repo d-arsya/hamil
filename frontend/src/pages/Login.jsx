@@ -98,7 +98,7 @@ export default function Login() {
             </button>
           </form>
           <p className="text-[11px] text-slate-400 mt-6">Hubungi bidan/admin pemilik akun jika lupa kredensial.</p>
-          <a href="/pasien/login" data-testid="pasien-login-link" className="block text-center text-xs font-bold text-[#C02650] hover:underline mt-3">
+          <a href="/ibu/login" data-testid="pasien-login-link" className="block text-center text-xs font-bold text-[#C02650] hover:underline mt-3">
             Ibu pasien? Masuk ke portal pasien di sini →
           </a>
         </div>

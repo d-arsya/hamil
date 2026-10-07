@@ -24,7 +24,7 @@ import Riwayat from "./pages/pasien/Riwayat";
 import Pengaturan from "./pages/pasien/Pengaturan";
 
 function PasienProtected() {
-  if (!localStorage.getItem("pasien_token")) return <Navigate to="/pasien/login" replace />;
+  if (!localStorage.getItem("pasien_token")) return <Navigate to="/ibu/login" replace />;
   return <PasienLayout />;
 }
 
@@ -47,19 +47,19 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/pasien/login" element={<PasienLogin />} />
+          <Route path="/ibu/login" element={<PasienLogin />} />
           <Route element={<PasienProtected />}>
-            <Route path="/pasien" element={<Beranda />} />
-            <Route path="/pasien/pantau" element={<Pemantauan />} />
-            <Route path="/pasien/mingguan" element={<Mingguan />} />
-            <Route path="/pasien/ttd" element={<TTD />} />
-            <Route path="/pasien/gerakan" element={<Gerakan />} />
-            <Route path="/pasien/bahaya" element={<TandaBahaya />} />
-            <Route path="/pasien/persiapan" element={<Persiapan />} />
-            <Route path="/pasien/edukasi" element={<EdukasiPasien />} />
-            <Route path="/pasien/perjalanan" element={<Perjalanan />} />
-            <Route path="/pasien/riwayat" element={<Riwayat />} />
-            <Route path="/pasien/pengaturan" element={<Pengaturan />} />
+            <Route path="/ibu" element={<Beranda />} />
+            <Route path="/ibu/pantau" element={<Pemantauan />} />
+            <Route path="/ibu/mingguan" element={<Mingguan />} />
+            <Route path="/ibu/ttd" element={<TTD />} />
+            <Route path="/ibu/gerakan" element={<Gerakan />} />
+            <Route path="/ibu/bahaya" element={<TandaBahaya />} />
+            <Route path="/ibu/persiapan" element={<Persiapan />} />
+            <Route path="/ibu/edukasi" element={<EdukasiPasien />} />
+            <Route path="/ibu/perjalanan" element={<Perjalanan />} />
+            <Route path="/ibu/riwayat" element={<Riwayat />} />
+            <Route path="/ibu/pengaturan" element={<Pengaturan />} />
           </Route>
           <Route element={<Protected />}>
             <Route path="/" element={<Dashboard />} />

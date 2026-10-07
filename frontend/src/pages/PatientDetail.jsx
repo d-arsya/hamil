@@ -470,14 +470,14 @@ export default function PatientDetail() {
           <div className="space-y-4">
             <p className="text-sm text-slate-500">Berikan kredensial ini kepada pasien (via WA atau langsung). <b>Password hanya tampil sekali</b> — catat baik-baik.</p>
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
-              <div className="text-sm">Halaman masuk: <b className="font-mono text-xs">{window.location.origin}/pasien/login</b></div>
+              <div className="text-sm">Halaman masuk: <b className="font-mono text-xs">{window.location.origin}/ibu/login</b></div>
               <div className="text-sm">Username: <b className="font-mono" data-testid="akun-username">{akunBaru.username}</b></div>
               <div className="text-sm">Password: <b className="font-mono" data-testid="akun-password">{akunBaru.password}</b></div>
             </div>
             <button
               data-testid="akun-copy-button"
               onClick={() => {
-                navigator.clipboard.writeText(`Portal BidanKu: ${window.location.origin}/pasien/login\nUsername: ${akunBaru.username}\nPassword: ${akunBaru.password}`);
+                navigator.clipboard.writeText(`Portal BidanKu: ${window.location.origin}/ibu/login\nUsername: ${akunBaru.username}\nPassword: ${akunBaru.password}`);
                 toast.success("Kredensial disalin");
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#C02650] text-white hover:bg-[#A01B40] transition-colors"
