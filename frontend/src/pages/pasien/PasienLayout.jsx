@@ -19,7 +19,7 @@ export default function PasienLayout() {
   const [me, setMe] = useState(null);
   const navigate = useNavigate();
 
-  const load = () => pasienApi.get("/ibu/me").then((r) => setMe(r.data)).catch(() => {});
+  const load = () => pasienApi.get("/pasien/me").then((r) => setMe(r.data)).catch(() => {});
   useEffect(() => {
     if (!localStorage.getItem("pasien_token")) {
       navigate("/ibu/login");

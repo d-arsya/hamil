@@ -29,13 +29,13 @@ export default function Pengaturan() {
   const p = me.pasien;
 
   useEffect(() => {
-    pasienApi.get("/ibu/pengingat").then((r) => setReminders(r.data)).catch(() => {});
+    pasienApi.get("/pasien/pengingat").then((r) => setReminders(r.data)).catch(() => {});
   }, []);
 
   const toggleReminder = async (k) => {
     const next = { ...reminders, [k]: !reminders[k] };
     setReminders(next);
-    await pasienApi.put("/ibu/pengingat", { items: next });
+    await pasienApi.put("/pasien/pengingat", { items: next });
     toast.success("Pengingat diperbarui");
   };
 

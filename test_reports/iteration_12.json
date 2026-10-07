@@ -1,0 +1,61 @@
+{
+  "summary": "Verifikasi fix performa (React.lazy + Suspense). Klinik lazy loading & backend regression: PASS. Portal pasien: CRITICAL BUG ditemukan — semua halaman portal stuck di 'Memuat...' (dari PasienLayout data-testid=pasien-loading) karena endpoint salah. Perf /ibu/login sangat cepat (COLD 0.38s, WARM 0.27s di viewport 390x844).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PasienLayout.jsx",
+        "issue": "Memanggil endpoint SALAH: pasienApi.get('/ibu/me') → GET /api/ibu/me yang return 404. Endpoint yang benar adalah /api/pasien/me. Karena .catch(() => {}) menelan error diam-diam, state `me` tetap null → SEMUA halaman portal pasien (/ibu, /ibu/pantau, /ibu/mingguan, /ibu/ttd, /ibu/gerakan, /ibu/bahaya, /ibu/persiapan, /ibu/edukasi, /ibu/perjalanan, /ibu/riwayat, /ibu/pengaturan) stuck di layar 'Memuat...' pasien-loading. Portal pasien efektif TIDAK BISA DIPAKAI oleh user.",
+        "selector": "data-testid=pasien-loading (teks 'Memuat...')",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Login pasien → Beranda",
+        "issue": "Login /api/pasien/login sukses, pasien_token tersimpan, redirect ke /ibu berhasil (1.13s). Tapi PasienLayout tidak bisa fetch profil karena GET /api/ibu/me → 404. Harus diubah ke /pasien/me di PasienLayout.jsx line 22.",
+        "affected_selectors": ["[data-testid=pasien-loading]", "[data-testid=pasien-app]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "performance_verification": {
+    "ibu_login_cold_cache_mobile_390x844": "0.38s (form interactive)",
+    "ibu_login_warm_cache_mobile_390x844": "0.27s",
+    "login_page_dom_contentloaded_cold": "0.28s",
+    "klinik_login_cold": "0.41s (form ready)",
+    "klinik_login_to_dashboard": "1.17s",
+    "verdict": "PASS - jauh di bawah 3s target. React.lazy + Suspense bekerja efektif (hanya chunk Login/PasienLogin yang di-load awal)."
+  },
+  "lazy_loading_regression": {
+    "klinik_pages": "PASS - /, /pasien, /edukasi, /laporan render tanpa error (~1.2-1.4s per nav), tidak ada page-loader stuck, tidak ada runtime error",
+    "pasien_pages": "BLOCKED oleh bug PasienLayout /ibu/me 404 — tidak bisa diverifikasi apakah lazy chunk masing-masing halaman portal render dengan benar karena layout tidak pernah mount Outlet"
+  },
+  "test_report_links": [
+    "/app/backend/tests/",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Perbaiki /app/frontend/src/pages/pasien/PasienLayout.jsx line 22 → ubah pasienApi.get('/ibu/me') menjadi pasienApi.get('/pasien/me'). Setelah fix, re-test semua 11 route portal pasien (/ibu, /ibu/pantau, /ibu/mingguan, /ibu/ttd, /ibu/gerakan, /ibu/bahaya, /ibu/persiapan, /ibu/edukasi, /ibu/perjalanan, /ibu/riwayat, /ibu/pengaturan) untuk memastikan tiap lazy chunk render.",
+    "SARAN: Pertimbangkan tambahkan error handling/toast di catch block PasienLayout agar failure tidak silent (user melihat 'Memuat...' forever)."
+  ],
+  "critical_code_review_comments": [
+    "PasienLayout.jsx:22 — endpoint mismatch (/ibu/me vs backend /pasien/me) adalah bug kritis yang membuat seluruh portal pasien tidak bisa diakses. Kemungkinan regresi pre-existing (tidak terkait langsung dengan lazy loading fix), tapi harus segera diperbaiki.",
+    "pasienApi.js:14-17 — interceptor hanya handle 401/403; status lain (404/500) harus di-log atau di-toast agar user & dev tahu ada masalah. .catch(() => {}) di PasienLayout menyembunyikan kegagalan.",
+    "App.js lazy loading implementation benar: hanya Login & PasienLogin yang eager, sisanya React.lazy dengan Suspense fallback <PageLoader data-testid='page-loader'>. Terkonfirmasi tidak ada chunk gagal dari sisi code splitting."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (133/133 pytest pass dalam 48s)",
+    "frontend_klinik": "100%",
+    "frontend_pasien_portal": "0% (blocked by /ibu/me 404)"
+  },
+  "test_credentials": "admin / Bidan#Aman2026xY9. Pasien dibuat & dihapus: TEST_perf_ibu (username testperfibu9363 / password 0ZIf5wLX) — sudah dihapus di akhir.",
+  "seed_data_creation": "Dibuat pasien TEST_perf_ibu + akun portal untuk tes login pasien. Sudah dihapus via DELETE /api/patients/{id}. db.login_attempts juga sudah di-clear di awal.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Setelah main agent perbaiki PasienLayout.jsx line 22 (/ibu/me → /pasien/me), re-test seluruh 11 route portal pasien untuk konfirmasi tiap lazy chunk render benar. Login pasien pakai akun yang dibuat via tombol akun di klinik PatientDetail (data default no_wa & hpht wajib saat buat pasien). Perf fix (React.lazy) sudah terverifikasi sukses dan tidak perlu di-retest."
+}

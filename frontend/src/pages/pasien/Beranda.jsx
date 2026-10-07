@@ -18,9 +18,9 @@ export default function Beranda() {
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
-    pasienApi.get("/ibu/ttd").then((r) => setTtdToday(r.data.find((t) => t.tanggal === today) || null)).catch(() => {});
-    pasienApi.get("/ibu/pemantauan?limit=1").then((r) => setPantauToday(r.data.find((x) => x.tanggal === today) || null)).catch(() => {});
-    pasienApi.get("/ibu/edukasi-klinik").then((r) => setPesan(r.data.pesan.slice(-3))).catch(() => {});
+    pasienApi.get("/pasien/ttd").then((r) => setTtdToday(r.data.find((t) => t.tanggal === today) || null)).catch(() => {});
+    pasienApi.get("/pasien/pemantauan?limit=1").then((r) => setPantauToday(r.data.find((x) => x.tanggal === today) || null)).catch(() => {});
+    pasienApi.get("/pasien/edukasi-klinik").then((r) => setPesan(r.data.pesan.slice(-3))).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
