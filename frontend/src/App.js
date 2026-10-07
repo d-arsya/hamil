@@ -1,27 +1,35 @@
 import "@/App.css";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import Layout from "./components/Layout";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Patients from "./pages/Patients";
-import PatientDetail from "./pages/PatientDetail";
-import Edukasi from "./pages/Edukasi";
-import Laporan from "./pages/Laporan";
 import PasienLogin from "./pages/pasien/PasienLogin";
-import PasienLayout from "./pages/pasien/PasienLayout";
-import Beranda from "./pages/pasien/Beranda";
-import Pemantauan from "./pages/pasien/Pemantauan";
-import Mingguan from "./pages/pasien/Mingguan";
-import TTD from "./pages/pasien/TTD";
-import Gerakan from "./pages/pasien/Gerakan";
-import TandaBahaya from "./pages/pasien/TandaBahaya";
-import Persiapan from "./pages/pasien/Persiapan";
-import EdukasiPasien from "./pages/pasien/EdukasiPasien";
-import Perjalanan from "./pages/pasien/Perjalanan";
-import Riwayat from "./pages/pasien/Riwayat";
-import Pengaturan from "./pages/pasien/Pengaturan";
+
+const Layout = lazy(() => import("./components/Layout"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Patients = lazy(() => import("./pages/Patients"));
+const PatientDetail = lazy(() => import("./pages/PatientDetail"));
+const Edukasi = lazy(() => import("./pages/Edukasi"));
+const Laporan = lazy(() => import("./pages/Laporan"));
+const PasienLayout = lazy(() => import("./pages/pasien/PasienLayout"));
+const Beranda = lazy(() => import("./pages/pasien/Beranda"));
+const Pemantauan = lazy(() => import("./pages/pasien/Pemantauan"));
+const Mingguan = lazy(() => import("./pages/pasien/Mingguan"));
+const TTD = lazy(() => import("./pages/pasien/TTD"));
+const Gerakan = lazy(() => import("./pages/pasien/Gerakan"));
+const TandaBahaya = lazy(() => import("./pages/pasien/TandaBahaya"));
+const Persiapan = lazy(() => import("./pages/pasien/Persiapan"));
+const EdukasiPasien = lazy(() => import("./pages/pasien/EdukasiPasien"));
+const Perjalanan = lazy(() => import("./pages/pasien/Perjalanan"));
+const Riwayat = lazy(() => import("./pages/pasien/Riwayat"));
+const Pengaturan = lazy(() => import("./pages/pasien/Pengaturan"));
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5]" data-testid="page-loader">
+    <div className="text-sm text-slate-400 animate-pulse">Memuat...</div>
+  </div>
+);
 
 function PasienProtected() {
   if (!localStorage.getItem("pasien_token")) return <Navigate to="/ibu/login" replace />;
@@ -45,6 +53,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/ibu/login" element={<PasienLogin />} />
@@ -70,6 +79,7 @@ function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
     </AuthProvider>
