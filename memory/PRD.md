@@ -79,6 +79,18 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - TTV lengkap di catat kontrol: SpO2, suhu, nadi, RR, LiLa, tinggi badan (tanpa grafik), tampil ringkas di kolom TD/TTV tabel riwayat
 - Checklist imunisasi TT ibu hamil (TT1-TT5, interval Kemenkes: TT2=4 mgg pasca TT1, TT3=6 bln, TT4/TT5=1 th) — ImunisasiTTPanel.jsx + /api/patients/{id}/imunisasi-tt, target dihitung dari tanggal dosis sebelumnya
 
+## Iterasi 10 (Sept 2026) — Portal Pasien Mobile-First
+- Akun pasien dibuat klinik dari rekam medis (POST /api/patients/{id}/akun → username+password sekali tampil, bisa reset); login terpisah /pasien/login dengan JWT role "pasien" (tidak bisa akses endpoint klinik)
+- Onboarding pasien: golongan darah, pendamping, kontak darurat, faskes (profil_lengkap gate)
+- Beranda: greeting, kartu kehamilan (usia/trimester/HPL/countdown/progress), quick actions, checklist harian, pengingat kontrol, pesan bidan, edukasi per trimester
+- Pemantauan harian (form <1 menit, deteksi tanda bahaya → peringatan), Pemantauan mingguan (checklist Buku KIA per trimester)
+- TTD/MMS tracker (kalender bulanan, kepatuhan, streak, alasan tidak minum, tips)
+- Gerakan bayi (counter ≥24 minggu, target ≥10/12 jam, grafik 14 hari)
+- Tanda bahaya per fase + tombol telepon kontak darurat
+- Persiapan persalinan (13 checklist + progress), Edukasi (9 kategori kartu + pesan bidan), Perjalanan (timeline sinkron klinik), Riwayat, Pengaturan (5 toggle reminder, kontak, logout)
+- Disclaimer medis di semua halaman; data sinkron via endpoint /api/pasien/*
+- File: /app/frontend/src/pages/pasien/* (12 halaman), /app/frontend/src/lib/pasienApi.js, /app/frontend/src/lib/konten.js
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

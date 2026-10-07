@@ -6,6 +6,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 import os
 import re
+import secrets
 import logging
 import uuid
 from datetime import datetime, timezone, date, timedelta
@@ -330,6 +331,11 @@ def serialize_patient(p: dict, checkups: list, imunisasi_done: Optional[list] = 
         "abortus": p.get("abortus", 0),
         "penyakit_penyerta": p.get("penyakit_penyerta", ""),
         "keluhan_utama": p.get("keluhan_utama", ""),
+        "golongan_darah": p.get("golongan_darah", ""),
+        "nama_pendamping": p.get("nama_pendamping", ""),
+        "kontak_darurat": p.get("kontak_darurat", ""),
+        "faskes": p.get("faskes", ""),
+        "profil_lengkap": p.get("profil_lengkap", False),
         "riwayat": p.get("riwayat", ""),
         "riwayat_kehamilan": p.get("riwayat_kehamilan", []),
         "catatan": p.get("catatan", ""),
@@ -927,6 +933,246 @@ async def delete_edukasi(msg_id: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+# ---------- PORTAL PASIEN ----------
+def create_pasien_token(user_id: str) -> str:
+    payload = {"sub": user_id, "role": "pasien", "exp": datetime.now(timezone.utc) + timedelta(days=30)}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+async def get_current_pasien(creds: HTTPAuthorizationCredentials = Depends(security)):
+    if not creds:
+        raise HTTPException(status_code=401, detail="Belum login")
+    try:
+        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Sesi tidak valid, silakan masuk kembali")
+    if payload.get("role") != "pasien":
+        raise HTTPException(status_code=403, detail="Akses khusus pasien")
+    pu = await db.patient_users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+    if not pu:
+        raise HTTPException(status_code=401, detail="Akun tidak ditemukan")
+    return pu
+
+
+class PasienLoginInput(BaseModel):
+    username: str
+    password: str
+
+
+class PasienProfilInput(BaseModel):
+    golongan_darah: Optional[str] = ""
+    nama_pendamping: Optional[str] = ""
+    kontak_darurat: Optional[str] = ""
+    faskes: Optional[str] = ""
+    no_wa: Optional[str] = None
+
+
+@api_router.post("/pasien/login")
+async def pasien_login(data: PasienLoginInput):
+    pu = await db.patient_users.find_one({"username": data.username.strip().lower()})
+    if not pu or not verify_password(data.password, pu["password_hash"]):
+        raise HTTPException(status_code=401, detail="Username atau password salah")
+    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0, "nama": 1})
+    return {"token": create_pasien_token(pu["id"]), "nama": p["nama"] if p else ""}
+
+
+@api_router.post("/patients/{patient_id}/akun")
+async def create_akun_pasien(patient_id: str, user=Depends(get_current_user)):
+    p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    slug = re.sub(r"[^a-z0-9]", "", p["nama"].lower())[:12] or "pasien"
+    username = f"{slug}{secrets.randbelow(9000) + 1000}"
+    while await db.patient_users.find_one({"username": username}):
+        username = f"{slug}{secrets.randbelow(9000) + 1000}"
+    password = secrets.token_urlsafe(6)
+    await db.patient_users.update_one(
+        {"patient_id": patient_id},
+        {"$set": {"username": username, "password_hash": hash_password(password), "created_at": datetime.now(timezone.utc).isoformat()},
+         "$setOnInsert": {"id": str(uuid.uuid4()), "patient_id": patient_id}},
+        upsert=True,
+    )
+    return {"username": username, "password": password}
+
+
+@api_router.get("/patients/{patient_id}/akun")
+async def get_akun_pasien(patient_id: str, user=Depends(get_current_user)):
+    pu = await db.patient_users.find_one({"patient_id": patient_id}, {"_id": 0, "password_hash": 0})
+    if not pu:
+        return {"ada": False}
+    return {"ada": True, "username": pu["username"], "created_at": pu.get("created_at")}
+
+
+@api_router.get("/pasien/me")
+async def pasien_me(pu=Depends(get_current_pasien)):
+    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Data tidak ditemukan")
+    checks = await db.checkups.find({"patient_id": p["id"]}, {"_id": 0}).to_list(1000)
+    checks.sort(key=lambda c: c["tanggal"])
+    imu = await db.imunisasi.find({"patient_id": p["id"]}, {"_id": 0}).to_list(100)
+    return {"pasien": serialize_patient(p, checks, imu), "timeline": build_timeline(p, checks), "checkups": checks}
+
+
+@api_router.put("/pasien/profil")
+async def pasien_profil(data: PasienProfilInput, pu=Depends(get_current_pasien)):
+    update = {
+        "golongan_darah": data.golongan_darah or "",
+        "nama_pendamping": data.nama_pendamping or "",
+        "kontak_darurat": data.kontak_darurat or "",
+        "faskes": data.faskes or "",
+        "profil_lengkap": True,
+    }
+    if data.no_wa:
+        update["no_wa"] = data.no_wa
+    await db.patients.update_one({"id": pu["patient_id"]}, {"$set": update})
+    return {"ok": True}
+
+
+class PemantauanInput(BaseModel):
+    kondisi: str
+    demam: str = "Tidak"
+    suhu: Optional[float] = None
+    demam_hari: Optional[int] = None
+    sakit_kepala: str = "Tidak"
+    nyeri_perut: str = "Tidak"
+    perdarahan: str = "Tidak"
+    cairan: str = "Tidak"
+    cairan_banyak: str = "Tidak"
+    sakit_bak: str = "Tidak"
+    keputihan: str = "Tidak"
+    mual: str = "Tidak"
+    mual_tingkat: Optional[str] = None
+    diare: str = "Tidak"
+    sesak: str = "Tidak"
+    emosional: str = "Biasa saja"
+    sulit_tidur: str = "Tidak"
+    keluhan_lain: Optional[str] = ""
+
+
+DANGER_LABELS = {
+    "demam": "Demam", "sakit_kepala": "Sakit kepala/pusing berat", "nyeri_perut": "Nyeri perut hebat",
+    "perdarahan": "Perdarahan dari jalan lahir", "cairan_banyak": "Cairan jalan lahir banyak/berbau",
+    "diare": "Diare berulang", "sesak": "Sesak napas/jantung berdebar",
+}
+
+
+@api_router.post("/pasien/pemantauan")
+async def add_pemantauan(data: PemantauanInput, pu=Depends(get_current_pasien)):
+    tanggal = date.today().isoformat()
+    bahaya = [label for k, label in DANGER_LABELS.items() if getattr(data, k, "Tidak") == "Ya"]
+    doc = data.model_dump()
+    doc.update({"patient_id": pu["patient_id"], "tanggal": tanggal, "tanda_bahaya": bahaya, "created_at": datetime.now(timezone.utc).isoformat()})
+    await db.pemantauan_harian.update_one({"patient_id": pu["patient_id"], "tanggal": tanggal}, {"$set": doc}, upsert=True)
+    return {"ok": True, "tanda_bahaya": bahaya}
+
+
+@api_router.get("/pasien/pemantauan")
+async def get_pemantauan(limit: int = 30, pu=Depends(get_current_pasien)):
+    docs = await db.pemantauan_harian.find({"patient_id": pu["patient_id"]}, {"_id": 0}).sort("tanggal", -1).to_list(limit)
+    return docs
+
+
+class MingguanInput(BaseModel):
+    minggu_ke: int
+    jawaban: dict
+
+
+@api_router.post("/pasien/mingguan")
+async def add_mingguan(data: MingguanInput, pu=Depends(get_current_pasien)):
+    bahaya = [k for k, v in data.jawaban.items() if v]
+    doc = {"patient_id": pu["patient_id"], "minggu_ke": data.minggu_ke, "jawaban": data.jawaban, "ada_bahaya": len(bahaya) > 0, "tanggal": date.today().isoformat(), "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.pemantauan_mingguan.update_one({"patient_id": pu["patient_id"], "minggu_ke": data.minggu_ke}, {"$set": doc}, upsert=True)
+    return {"ok": True, "ada_bahaya": len(bahaya) > 0}
+
+
+@api_router.get("/pasien/mingguan")
+async def get_mingguan(pu=Depends(get_current_pasien)):
+    return await db.pemantauan_mingguan.find({"patient_id": pu["patient_id"]}, {"_id": 0}).sort("minggu_ke", -1).to_list(50)
+
+
+class TtdInput(BaseModel):
+    tanggal: Optional[str] = None
+    status: str  # "sudah" | "tidak"
+    alasan: Optional[str] = ""
+
+
+@api_router.post("/pasien/ttd")
+async def add_ttd(data: TtdInput, pu=Depends(get_current_pasien)):
+    if data.status not in ("sudah", "tidak"):
+        raise HTTPException(status_code=400, detail="Status tidak valid")
+    tanggal = data.tanggal or date.today().isoformat()
+    parse_date(tanggal, "tanggal")
+    await db.ttd.update_one(
+        {"patient_id": pu["patient_id"], "tanggal": tanggal},
+        {"$set": {"patient_id": pu["patient_id"], "tanggal": tanggal, "status": data.status, "alasan": data.alasan or "", "created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api_router.get("/pasien/ttd")
+async def get_ttd(pu=Depends(get_current_pasien)):
+    return await db.ttd.find({"patient_id": pu["patient_id"]}, {"_id": 0}).sort("tanggal", -1).to_list(400)
+
+
+@api_router.post("/pasien/gerakan")
+async def add_gerakan(pu=Depends(get_current_pasien)):
+    tanggal = date.today().isoformat()
+    await db.gerakan.update_one(
+        {"patient_id": pu["patient_id"], "tanggal": tanggal},
+        {"$inc": {"jumlah": 1}, "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    doc = await db.gerakan.find_one({"patient_id": pu["patient_id"], "tanggal": tanggal}, {"_id": 0})
+    return doc
+
+
+@api_router.get("/pasien/gerakan")
+async def get_gerakan(pu=Depends(get_current_pasien)):
+    return await db.gerakan.find({"patient_id": pu["patient_id"]}, {"_id": 0}).sort("tanggal", -1).to_list(60)
+
+
+class ItemsInput(BaseModel):
+    items: dict
+
+
+@api_router.get("/pasien/persiapan")
+async def get_persiapan(pu=Depends(get_current_pasien)):
+    doc = await db.persiapan.find_one({"patient_id": pu["patient_id"]}, {"_id": 0})
+    return {"items": doc["items"] if doc else {}}
+
+
+@api_router.put("/pasien/persiapan")
+async def put_persiapan(data: ItemsInput, pu=Depends(get_current_pasien)):
+    await db.persiapan.update_one({"patient_id": pu["patient_id"]}, {"$set": {"items": data.items}}, upsert=True)
+    return {"ok": True}
+
+
+PENGINGAT_DEFAULT = {"ttd": True, "harian": True, "gerakan": True, "kontrol": True, "edukasi": True}
+
+
+@api_router.get("/pasien/pengingat")
+async def get_pengingat(pu=Depends(get_current_pasien)):
+    doc = await db.pengingat.find_one({"patient_id": pu["patient_id"]}, {"_id": 0})
+    return doc["settings"] if doc else PENGINGAT_DEFAULT
+
+
+@api_router.put("/pasien/pengingat")
+async def put_pengingat(data: ItemsInput, pu=Depends(get_current_pasien)):
+    await db.pengingat.update_one({"patient_id": pu["patient_id"]}, {"$set": {"settings": data.items}}, upsert=True)
+    return {"ok": True}
+
+
+@api_router.get("/pasien/edukasi-klinik")
+async def pasien_edukasi_klinik(pu=Depends(get_current_pasien)):
+    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})
+    checks = await db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000)
+    fase = compute_status(p, checks)["fase"]
+    msgs = await db.edukasi.find({"fase": fase}, {"_id": 0}).sort("created_at", 1).to_list(50)
+    return {"fase": fase, "pesan": msgs}
+
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -944,6 +1190,10 @@ async def startup():
     await db.checkups.create_index("patient_id")
     await db.imunisasi.create_index("patient_id")
     await db.imunisasi_tt.create_index("patient_id")
+    await db.patient_users.create_index("username", unique=True)
+    await db.pemantauan_harian.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
+    await db.ttd.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
+    await db.gerakan.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
     await db.login_attempts.create_index("username", unique=True)
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
     password = os.environ["ADMIN_PASSWORD"]

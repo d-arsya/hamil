@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2, Gift, Check,
+  ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2, Gift, Check, Smartphone, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
@@ -41,6 +41,22 @@ export default function PatientDetail() {
   const [deliveryData, setDeliveryData] = useState(emptyDelivery);
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [waTemplate, setWaTemplate] = useState(null);
+  const [akun, setAkun] = useState(null);
+  const [akunBaru, setAkunBaru] = useState(null);
+
+  const loadAkun = () => api.get(`/patients/${id}/akun`).then((r) => setAkun(r.data)).catch(() => {});
+  useEffect(() => { loadAkun(); }, [id]);
+
+  const buatAkun = async () => {
+    if (akun?.ada && !window.confirm("Reset password akun pasien? Password lama tidak bisa dipakai lagi.")) return;
+    try {
+      const { data: a } = await api.post(`/patients/${id}/akun`);
+      setAkunBaru(a);
+      loadAkun();
+    } catch {
+      toast.error("Gagal membuat akun pasien");
+    }
+  };
 
   const load = () => api.get(`/patients/${id}`).then((r) => setData(r.data)).catch(() => navigate("/pasien"));
   useEffect(() => {
@@ -242,6 +258,23 @@ export default function PatientDetail() {
             <InfoItem label="Riwayat" value={p.riwayat} />
             <InfoItem label="Catatan" value={p.catatan} />
           </div>
+          <div className="col-span-2 mt-1 pt-3 border-t border-slate-100">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Akun Portal Pasien</div>
+            {akun === null ? (
+              <div className="text-xs text-slate-400">Memuat...</div>
+            ) : akun.ada ? (
+              <div className="flex flex-wrap items-center gap-2" data-testid="akun-info">
+                <span className="text-xs text-slate-600">Username: <b className="font-mono">{akun.username}</b> · password hanya tampil saat dibuat/direset</span>
+                <button data-testid="akun-reset-button" onClick={buatAkun} className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                  Reset Password
+                </button>
+              </div>
+            ) : (
+              <button data-testid="akun-create-button" onClick={buatAkun} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                <Smartphone className="w-3.5 h-3.5" /> Buat Akun untuk Pasien
+              </button>
+            )}
+          </div>
         </div>
         <div className={cardCls}>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Kehamilan</h3>
@@ -431,6 +464,29 @@ export default function PatientDetail() {
 
       <PatientForm open={editOpen} onClose={() => setEditOpen(false)} onSaved={load} initial={p} />
       <CheckupForm open={checkupOpen} onClose={() => setCheckupOpen(false)} onSaved={load} patient={p} />
+
+      <Modal open={Boolean(akunBaru)} onClose={() => setAkunBaru(null)} title="Akun Portal Pasien" testid="akun-modal">
+        {akunBaru && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500">Berikan kredensial ini kepada pasien (via WA atau langsung). <b>Password hanya tampil sekali</b> — catat baik-baik.</p>
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
+              <div className="text-sm">Halaman masuk: <b className="font-mono text-xs">{window.location.origin}/pasien/login</b></div>
+              <div className="text-sm">Username: <b className="font-mono" data-testid="akun-username">{akunBaru.username}</b></div>
+              <div className="text-sm">Password: <b className="font-mono" data-testid="akun-password">{akunBaru.password}</b></div>
+            </div>
+            <button
+              data-testid="akun-copy-button"
+              onClick={() => {
+                navigator.clipboard.writeText(`Portal BidanKu: ${window.location.origin}/pasien/login\nUsername: ${akunBaru.username}\nPassword: ${akunBaru.password}`);
+                toast.success("Kredensial disalin");
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#C02650] text-white hover:bg-[#A01B40] transition-colors"
+            >
+              <Copy className="w-4 h-4" /> Salin Kredensial
+            </button>
+          </div>
+        )}
+      </Modal>
       <WaReminder open={waOpen} onClose={() => { setWaOpen(false); setWaTemplate(null); }} patient={p} bidanNama={user?.nama} initialTemplate={waTemplate} />
 
       <Modal open={deliveryOpen} onClose={() => setDeliveryOpen(false)} title={p.tanggal_persalinan ? "Edit Data Persalinan & Bayi" : "Tandai Persalinan"} testid="delivery-modal">
