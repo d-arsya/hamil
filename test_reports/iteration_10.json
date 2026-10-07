@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 10 (PORTAL PASIEN) — Backend 133/133 pytest pass (25 new portal pasien tests + 108 regression). Frontend sanity verified: pasien-login page, clinic-login-link, admin login + akun-create modal (username/password + copy button + reset button + akun-info), pasien login + onboarding render, bottom nav + disclaimer. Backend fully validated: akun create/get/reset (old password invalidated), pasien JWT role isolation (pasien token → 403 on /api/patients; admin token → 403 on /api/pasien/me; no token → 401), onboarding profil persistence, pemantauan harian (DANGER_LABELS detection: perdarahan+sakit_kepala → tanda_bahaya correctly flagged), mingguan (ada_bahaya), ttd (sudah/tidak + alasan + invalid 400), gerakan ($inc), persiapan/pengingat persist, edukasi-klinik sync (klinik posts edukasi → pasien sees it in current fase).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/patients/{id}", "issue": "Does NOT cascade-delete related portal data: patient_users, pemantauan_harian, pemantauan_mingguan, ttd, gerakan, persiapan, pengingat. Orphan rows remain (confirmed via mongosh). Users deleted via UI would leave their portal account + health data orphaned. Had to clean up manually."},
+      {"endpoint": "POST /api/pasien/login", "issue": "No brute-force lockout for patient login (admin has 5-fail lockout). Patient portal login allows unlimited password attempts."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_portal_pasien.py",
+    "/app/test_reports/pytest/iter10.xml"
+  ],
+  "action_items": [
+    "Add cascade delete on DELETE /api/patients/{id} to also remove patient_users and related pemantauan/ttd/gerakan/mingguan/persiapan/pengingat rows (prevents orphan portal accounts + GDPR hygiene).",
+    "Consider adding login_attempts/lockout for POST /api/pasien/login (symmetry with klinik auth)."
+  ],
+  "critical_code_review_comments": [
+    "server.py (1216 lines) is approaching the 700-line split threshold; recommend splitting portal_pasien routes into a separate router module (e.g. routers/pasien.py) in a future iteration.",
+    "DELETE /api/patients does not cascade — risk of orphan portal accounts and health data (see minor backend issue above).",
+    "No rate limiting / brute-force protection on /api/pasien/login.",
+    "Onboarding select options use labels only (A, B, AB, O, Belum tahu) — not 'O+' / 'O-' etc. Fine functionally but potentially less clinical granularity than typical blood-type UIs.",
+    "patient_users unique index on username is good; collision retry loop in create_akun_pasien is correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_portal_pasien.py (new, 25 tests)"
+  ],
+  "success_rate": {"backend": "100% (133/133)", "frontend": "90% (akun flow + login + onboarding render verified via Playwright; remaining pasien pages validated via API tests; one UI script option-value mismatch was a test-script issue not a product bug)"},
+  "test_credentials": "admin / Bidan#Aman2026xY9 (from /app/memory/test_credentials.md). Pasien portal credentials are generated per-patient via POST /api/patients/{id}/akun.",
+  "seed_data_creation": "Test patient TEST_portal_Ibu (and TEST_portal_UI) created and DELETED. Orphan patient_users (testportal*) and related pemantauan/ttd/gerakan/mingguan/persiapan/pengingat/edukasi (TEST_portal_*) cleaned via mongosh. login_attempts cleared. Final DB state: 0 TEST_portal_* residue.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Portal pasien backend fully covered by /app/backend/tests/test_portal_pasien.py (25 tests, module-scoped fixtures with autouse cleanup). To run: export REACT_APP_BACKEND_URL=<preview> && pytest backend/tests/ -q -n 0 → expect 133 pass. If adding more pasien features, extend this file. Note: Onboarding goldar select values are ['A','B','AB','O','Belum tahu'] (not 'O+'). PatientDetail akun card test IDs: akun-create-button, akun-modal, akun-username, akun-password, akun-copy-button, akun-info, akun-reset-button — all present and functional.",
+  "rca of the issue": "No critical issues. Only minor cleanup/cascading improvement for DELETE /api/patients and optional lockout for pasien login."
+}

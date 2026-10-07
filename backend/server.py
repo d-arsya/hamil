@@ -479,6 +479,14 @@ async def delete_patient(patient_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
     await db.checkups.delete_many({"patient_id": patient_id})
     await db.imunisasi.delete_many({"patient_id": patient_id})
+    await db.imunisasi_tt.delete_many({"patient_id": patient_id})
+    await db.patient_users.delete_many({"patient_id": patient_id})
+    await db.pemantauan_harian.delete_many({"patient_id": patient_id})
+    await db.pemantauan_mingguan.delete_many({"patient_id": patient_id})
+    await db.ttd.delete_many({"patient_id": patient_id})
+    await db.gerakan.delete_many({"patient_id": patient_id})
+    await db.persiapan.delete_many({"patient_id": patient_id})
+    await db.pengingat.delete_many({"patient_id": patient_id})
     return {"ok": True}
 
 
@@ -969,9 +977,23 @@ class PasienProfilInput(BaseModel):
 
 @api_router.post("/pasien/login")
 async def pasien_login(data: PasienLoginInput):
-    pu = await db.patient_users.find_one({"username": data.username.strip().lower()})
+    username = data.username.strip().lower()
+    attempts = await db.login_attempts.find_one({"username": f"pasien:{username}"})
+    if attempts and attempts.get("count", 0) >= 5:
+        locked_until = attempts.get("locked_until")
+        if locked_until and datetime.now(timezone.utc) < datetime.fromisoformat(locked_until):
+            raise HTTPException(status_code=429, detail="Terlalu banyak percobaan login. Coba lagi dalam 15 menit.")
+        await db.login_attempts.delete_one({"username": f"pasien:{username}"})
+        attempts = None
+    pu = await db.patient_users.find_one({"username": username})
     if not pu or not verify_password(data.password, pu["password_hash"]):
+        new_count = (attempts.get("count", 0) if attempts else 0) + 1
+        update = {"count": new_count}
+        if new_count >= 5:
+            update["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+        await db.login_attempts.update_one({"username": f"pasien:{username}"}, {"$set": update}, upsert=True)
         raise HTTPException(status_code=401, detail="Username atau password salah")
+    await db.login_attempts.delete_one({"username": f"pasien:{username}"})
     p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0, "nama": 1})
     return {"token": create_pasien_token(pu["id"]), "nama": p["nama"] if p else ""}
 
