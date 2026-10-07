@@ -92,6 +92,7 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - File: /app/frontend/src/pages/pasien/* (12 halaman), /app/frontend/src/lib/pasienApi.js, /app/frontend/src/lib/konten.js
 
 - Hardening: hapus pasien kini cascade ke seluruh data portal (akun, pemantauan, TTD, gerakan, dll); login pasien punya lockout brute-force 5x → 15 menit (testing iterasi 10: 133/133 pass)
+- Bug fix iterasi 11: route collision /pasien (daftar pasien klinik vs beranda portal) → portal pasien dipindah ke /ibu/*; daftar pasien klinik normal kembali
 
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)

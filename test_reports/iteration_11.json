@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend regression verification for route-collision bug fix (portal pasien moved from /pasien/* to /ibu/*). All critical flows pass: Daftar Pasien klinik tampil benar di /pasien, portal pasien dipindah ke /ibu dengan redirect, akun modal menampilkan link /ibu/login, portal login berhasil mendarat di /ibu, dan tidak ada stray /pasien/* link di portal pasien.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PasienLayout render Onboarding ketika profil_lengkap=false — bottom nav tidak terlihat sampai pasien menyelesaikan onboarding. Perilaku ini benar namun worth noting untuk test coverage."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not tested per request)", "frontend": "100% on route-collision regression"},
+  "test_credentials": "klinik admin / Bidan#Aman2026xY9; TEST_route_Patient* dibuat & dihapus di tengah test",
+  "seed_data_creation": "Dibuat 3 pasien TEST_route_Patient[1-3] via UI klinik, semuanya dihapus di akhir setiap sub-test (soft-delete via tombol trash + confirm). Tidak ada data TEST tersisa (verified via list reload)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Route fix verified: /pasien = Daftar Pasien klinik (patients-page), /pasien/:id = detail RM; portal pasien seluruhnya di /ibu/* dengan NavLink testid pasien-nav-*. Credential modal pakai regex `Password:\\s+(\\S+)` (hati-hati karena ada phrase 'Password hanya tampil sekali' sebelum nilai actual). Patient dengan profil_lengkap=false akan menampilkan Onboarding, bukan bottom nav — jadi untuk tes bottom-nav lebih dalam, isi onboarding dulu atau pakai pasien existing dengan profil terisi.",
+  "verification_details": {
+    "bug_fix_verified": [
+      "PASS: /login → klik nav-pasien → URL /pasien → patients-page tampil (BUKAN portal login)",
+      "PASS: patient-row link → /pasien/:id (UUID) → detail RM tampil",
+      "PASS: akun-create-button di detail → modal menampilkan 'Halaman masuk: {origin}/ibu/login' (tidak ada /pasien/login)",
+      "PASS: /ibu tanpa pasien_token → redirect /ibu/login",
+      "PASS: /login punya link ke /ibu/login (data-testid=pasien-login-link)",
+      "PASS: /ibu/login punya link ke /login (bidan)",
+      "PASS: portal login dengan kredensial dari modal → mendarat di /ibu",
+      "PASS: tidak ada href /pasien/* di DOM portal pasien"
+    ]
+  }
+}
