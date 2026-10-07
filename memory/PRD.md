@@ -93,6 +93,7 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 
 - Hardening: hapus pasien kini cascade ke seluruh data portal (akun, pemantauan, TTD, gerakan, dll); login pasien punya lockout brute-force 5x → 15 menit (testing iterasi 10: 133/133 pass)
 - Bug fix iterasi 11: route collision /pasien (daftar pasien klinik vs beranda portal) → portal pasien dipindah ke /ibu/*; daftar pasien klinik normal kembali
+- Iterasi 12-13: performa portal pasien (React.lazy code splitting, login <0.5s) + fix endpoint collision /ibu→/pasien di API calls (testing iterasi 13: 133/133 pass, 11/11 route portal OK)
 
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)

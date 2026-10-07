@@ -1,0 +1,43 @@
+{
+  "summary": "Retest iterasi 13: verifikasi fix pasienApi endpoint collision (/ibu/* -> /pasien/*). HASIL: FIX BERHASIL. Semua 11 route portal pasien render (tidak stuck Memuat). Grep bersih: tidak ada pasienApi.* yang masih memanggil /ibu/*. Backend 133/133 pytest pass. Flow data (TTD, pengingat, pemantauan, edukasi, profil) berfungsi. Klinik regresi normal (login admin -> dashboard -> daftar pasien -> detail dengan akun card).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ibu/perjalanan", "issues": ["Kontrol berikutnya menampilkan tanggal lampau '24 Agt 2025' untuk pasien dgn HPHT 2025-06-01 (usia 70 mgg) — logic jadwal kontrol tidak dikembalikan ke masa depan utk kasus overdue. Minor, tidak terkait fix iterasi 13."]}
+    ]
+  },
+  "verifications": {
+    "grep_pasienApi_ibu_calls": "0 (clean)",
+    "routes_rendered_no_stuck": ["/ibu","/ibu/pantau","/ibu/mingguan","/ibu/ttd","/ibu/gerakan","/ibu/bahaya","/ibu/persiapan","/ibu/edukasi","/ibu/perjalanan","/ibu/riwayat","/ibu/pengaturan"],
+    "data_flow": {
+      "beranda": "render dgn nama pasien + kartu kehamilan",
+      "ttd_mark_sudah": "POST /pasien/ttd 200, kalender menampilkan ✓ pada tanggal 7",
+      "pengaturan_toggle": "PUT /pasien/pengingat {items: {...}} 200, state tersimpan (verifikasi via GET /pasien/pengingat)",
+      "perjalanan": "menampilkan timeline kontrol dari klinik",
+      "edukasi": "menampilkan 4 kategori (Kehamilan/Nutrisi/TTD-MMS/Perkembangan)"
+    },
+    "klinik_regression": "login admin OK, /pasien list render 7 pasien, detail pasien menampilkan akun card, dashboard menampilkan stats (7 total, 0 kontrol hari ini, 3 terlambat, 1 nifas)",
+    "backend_pytest": "133 passed in 50.35s (iter13.xml)"
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iter13.xml",
+    "/app/backend/tests/"
+  ],
+  "action_items": [
+    "OPTIONAL (bukan dari iterasi 13): perbaiki logic 'Kontrol berikutnya' di /ibu/perjalanan agar menampilkan jadwal valid (bukan tanggal lampau) untuk pasien yang overdue. Low priority.",
+    "OPTIONAL: tambah error handling/toast di catch block PasienLayout + pages lainnya agar failure endpoint tidak silent (saran lama dari iter12, masih relevan)."
+  ],
+  "critical_code_review_comments": [
+    "Fix sudah proper: semua pasienApi.get/put/post menggunakan prefix /pasien/* sedangkan route React Router tetap /ibu/*. Separasi URL layer (navigasi) dan API path jelas.",
+    "Pengaturan.jsx mengirim {items: dict} dan backend menerima dict — konsisten."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100% (133/133)", "frontend_klinik": "100%", "frontend_pasien_portal": "100% (11/11 routes render)" },
+  "test_credentials": "admin / Bidan#Aman2026xY9. Pasien uji TEST_fix_1791390897 (username testfix179135539 / password BEkBPo8l) sudah DIHAPUS di akhir.",
+  "seed_data_creation": "Buat pasien TEST_fix_1791390897 via POST /api/patients + akun portal via POST /api/patients/{id}/akun. Login pasien + onboarding (profil) + mark TTD + toggle pengingat. Semua dihapus via DELETE /api/patients/{id} = 200.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug kritis iter12 (PasienLayout /ibu/me 404) sudah fix dan terverifikasi. Semua 11 route portal pasien berfungsi. Perf lazy loading sudah PASS iter12. Hanya 1 minor design issue tersisa di /ibu/perjalanan (jadwal kontrol lampau untuk pasien overdue). Pasien 'ibu' dan 'dava' tetap ada (tidak dihapus sesuai instruksi)."
+}

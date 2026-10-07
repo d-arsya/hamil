@@ -25,8 +25,14 @@ export default function Perjalanan() {
             <CalendarClock className="w-5 h-5" />
             <span className="text-sm font-bold">Kontrol berikutnya</span>
           </div>
-          <div className="text-2xl font-extrabold">{fmtDate(p.jadwal_berikutnya)}</div>
-          <div className="text-white/80 text-xs font-semibold">Kunjungan {p.kunjungan_berikutnya}</div>
+          <div className="text-2xl font-extrabold">
+            {p.selisih_hari != null && p.selisih_hari < 0 ? "Segera kontrol ya, Bu!" : fmtDate(p.jadwal_berikutnya)}
+          </div>
+          <div className="text-white/80 text-xs font-semibold">
+            {p.selisih_hari != null && p.selisih_hari < 0
+              ? `Jadwal ${p.kunjungan_berikutnya} sudah lewat ${-p.selisih_hari} hari (${fmtDate(p.jadwal_berikutnya)})`
+              : `Kunjungan ${p.kunjungan_berikutnya}`}
+          </div>
         </div>
       )}
 
