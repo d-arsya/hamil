@@ -1,0 +1,77 @@
+{
+  "summary": "Iterasi 14 (BidanKu): 7 fitur baru diuji — backend 100% pass (19/19 pytest baru + 131/133 legacy; 2 legacy fail bersifat flaky lockout/timeout). Frontend klinik (Follow-Up, Profil, Laporan tambahan, panel Pemantauan di detail pasien, badge Bahaya di daftar pasien) berfungsi. API portal (/pasien/janji, /pasien/ttd masa lampau, dsb.) OK. SATU BUG KRITIS DITEMUKAN: Beranda portal pasien (/ibu) crash dengan ReferenceError 'pesan is not defined' karena saat menghapus kartu 'Pesan dari Bidan' hanya state-nya yang dihapus, tapi JSX block {pesan.length > 0 && ...} di Beranda.jsx baris 106-115 masih merujuk variabel 'pesan'. Portal ibu RUSAK untuk semua pasien (white-screen error overlay).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/change-password", "issue": "test_change_password_too_short intermittent ConnectTimeout to preview URL (pre-existing network flakiness, non-blocking)"},
+      {"endpoint": "/api/auth/login", "issue": "test_lockout_then_correct_password_rejected: setelah 2 gagal langsung 429 (lockout aktif). Kemungkinan test lain memperlakukan login_attempts collection; bukan regresi iter14."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "pages/pasien/Beranda.jsx", "issue": "ReferenceError: 'pesan is not defined'. Baris 106-115 masih mereferensikan state `pesan` yang sudah dihapus. Membuat /ibu (Beranda) + semua halaman yg render Beranda crash total untuk pasien. HAPUS baris 106-115 (block Pesan dari Bidan).", "selector": "data-testid=beranda-pesan-bidan", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ibu/perjalanan", "issues": ["(Carry-over iter13, low) Kontrol berikutnya menampilkan tanggal lampau untuk pasien overdue."]}
+    ]
+  },
+  "verifications": {
+    "backend_pytest_iter14": "19/19 passed (test_iteration14.py)",
+    "backend_pytest_all": "131 passed / 2 flaky-failed / 133 total",
+    "pengaturan_normalize_08_to_62": "OK (081234567890 -> 6281234567890)",
+    "pengaturan_short_wa_rejected": "OK (400)",
+    "followup_mark_and_toggle": "OK (sudah_followup True after POST, excludes 'selesai' status)",
+    "followup_404_nonexistent_patient": "OK",
+    "laporan_fields_present": "perlu_followup/perlu_followup_list/perlu_update/perlu_update_list OK",
+    "patients_list_pantau_field": "muncul setelah pemantauan dgn bahaya (<=7 hari)",
+    "patient_pemantauan_endpoint": "harian/mingguan/ttd/gerakan OK",
+    "auth_users_create_login_duplicate": "OK (duplicate->400, short pw->400, invalid username->400, user baru bisa login)",
+    "ttd_future_rejected": "OK",
+    "ttd_past_no_reason_rejected": "OK",
+    "ttd_past_with_reason_saved": "OK",
+    "pasien_janji_placeholder_rendered": "wa.me/6281234567890?text=Halo%20bidan%2C%20saya%20TEST_UI2_...%20ingin%20kontrol%20pada%2023%20Sep%202025",
+    "clinic_ui": {
+      "sidebar_has_followup_profil": true,
+      "/followup": "render, stats, template preview, 6 rows, Kirim WA & Tandai -> sudah_followup badge appears",
+      "/profil": "semua testid hadir (wa, template janji, template followup, save, pw submit, user list, add user)",
+      "/laporan": "5 kartu stat + 2 kartu list (followup/update) + anc K1-K6 + pnc KF1-KF4 hadir",
+      "/pasien/{id}": "panel 'Pemantauan Mandiri Pasien (Portal)' tampil",
+      "/pasien list": "badge 'Bahaya' tampil pada pasien yang submit pemantauan dgn perdarahan"
+    },
+    "patient_portal_ui": {
+      "/ibu/pengaturan": "menu 'Janji Temu / Kontrol' hadir",
+      "/ibu/janji": "wa.me link hadir dengan nomor + pesan terisi",
+      "/ibu/ttd": "kalender menampilkan sel masa lampau, click -> modal, klik SUDAH tanpa alasan -> toast error dgn kata 'alasan', dgn alasan -> tersimpan dan modal tutup, badge ✓ muncul",
+      "/ibu/beranda": "CRASH — 'pesan is not defined' overlay",
+      "/ibu/edukasi": "tidak menampilkan 'Pesan dari Bidan Ibu' (clean)"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration14.py",
+    "/app/test_reports/pytest/iter14.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Hapus baris 106-115 di /app/frontend/src/pages/pasien/Beranda.jsx (block {pesan.length > 0 && ...}) karena state `pesan` sudah dihapus → Beranda portal pasien crash. Setelah fix, 'Buat Janji Kontrol' card (sudah ada di source) akan terlihat normal.",
+    "OPTIONAL: Investigasi test_lockout_then_correct_password_rejected (iter2) — mungkin perlu reset db.login_attempts di fixture setup."
+  ],
+  "critical_code_review_comments": [
+    "Beranda.jsx: cleanup penghapusan fitur 'Pesan dari Bidan' tidak lengkap. Pola bagus: pastikan grep variable sebelum commit saat menghapus fitur.",
+    "Endpoint baru /api/pengaturan + render_template rapi, placeholder substitution via render_template bekerja dengan baik.",
+    "Query /api/patients melakukan N+1 patient_with_checkups loop; untuk >1000 pasien akan lambat (minor perf)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration14.py"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 iter14, 131/133 overall)",
+    "frontend_klinik": "100%",
+    "frontend_pasien_portal": "80% (Beranda crash; halaman lain OK)"
+  },
+  "test_credentials": "admin / Bidan#Aman2026xY9 (dari /app/memory/test_credentials.md). Pasien uji dibuat ad-hoc & dihapus.",
+  "seed_data_creation": "Pasien TEST_iter14_*, TEST_UI*_*, TEST_BAHAYA_*, TEST_JANJI_* dibuat selama tes dan sudah DELETE di akhir. Pengaturan klinik diset wa_bidan=6281234567890, template_janji='Halo bidan, saya {nama} ingin kontrol pada {jadwal}', template_followup='FU'.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fix minimal: hapus 10 baris di Beranda.jsx (106-115). Setelah fix, verifikasi: (1) /ibu/beranda tidak crash, (2) data-testid=beranda-janji-link muncul, (3) klik → /ibu/janji → wa.me href OK. Backend tidak perlu retest kecuali ada perubahan.",
+  "rca_of_the_issue": "Saat implementasi fitur #1 iter14 (hapus 'Pesan dari Bidan' di portal pasien), state `pesan` di Beranda.jsx dihapus TAPI block JSX yang mereferensikannya (lines 106-115) tidak ikut dihapus. React runtime melempar ReferenceError saat render Beranda. Dampak: 100% pasien yang login akan melihat error overlay 'Uncaught runtime errors: pesan is not defined' alih-alih home portal. Repro: login pasien manapun → langsung redirect ke /ibu → error overlay. Mitigasi: Hapus baris 106-115 (block {pesan.length > 0 && <div>...Pesan dari Bidan...</div>})."
+}

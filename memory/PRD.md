@@ -95,6 +95,16 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Bug fix iterasi 11: route collision /pasien (daftar pasien klinik vs beranda portal) → portal pasien dipindah ke /ibu/*; daftar pasien klinik normal kembali
 - Iterasi 12-13: performa portal pasien (React.lazy code splitting, login <0.5s) + fix endpoint collision /ibu→/pasien di API calls (testing iterasi 13: 133/133 pass, 11/11 route portal OK)
 
+## Iterasi 14 (Okt 2026) — 7 fitur permintaan bidan
+1. "Pesan dari Bidan" dihapus dari portal pasien (Beranda & EdukasiPasien); endpoint /pasien/edukasi-klinik dipertahankan
+2. Pemantauan mandiri pasien tampil di klinik: panel PemantauanPasien.jsx di detail pasien (harian/mingguan/TTD/gerakan, GET /api/patients/{id}/pemantauan) + badge "Bahaya"/"Pantau baru" di daftar pasien (field pantau di GET /api/patients untuk pemantauan ≤7 hari)
+3. Laporan tambahan: kartu "Perlu Follow-Up Kontrol" & "Perlu Update Data" (identitas belum lengkap / >30 hari tidak kontrol) dengan daftar nama yang bisa diklik — field perlu_followup(_list) & perlu_update(_list) di GET /api/laporan
+4. TTD tanggal terlewat bisa diisi/diubah lewat kalender (klik tanggal lampau → modal, alasan wajib, bisa custom); backend menolak tanggal lampau tanpa alasan & tanggal masa depan (POST /api/pasien/ttd)
+5. Menu Janji Temu portal ibu (/ibu/janji): tombol sekali klik → wa.me nomor bidan dengan pesan template terisi data pasien (GET /api/pasien/janji); nomor WA bidan + template diatur di halaman Profil (GET/PUT /api/pengaturan, koleksi pengaturan id=klinik, normalisasi 08→62)
+6. Menu Follow-Up Mingguan (/followup): semua pasien aktif (prioritas jatuh tempo ≤7 hari/terlambat di atas), template pengingat kontrol bisa diedit, tombol "Kirim WA & Tandai" menandai sudah follow-up per minggu ISO (koleksi followup_log, GET /api/followup + POST /api/followup/{id})
+7. Halaman Profil (/profil): nomor WA bidan, template janji & follow-up, manajemen pengguna (GET/POST /api/auth/users — tambah user akses penuh, username unik, password ≥8), ganti password
+- Fix critical: sisa blok JSX "pesan" di Beranda.jsx menyebabkan crash portal (testing iterasi 14: 19/19 backend baru pass, 131/133 legacy pass — 2 flaky lockout/timeout pre-existing; frontend 100% setelah fix)
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)
