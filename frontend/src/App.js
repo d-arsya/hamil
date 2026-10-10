@@ -35,7 +35,6 @@ const PageLoader = () => (
 );
 
 function PasienProtected() {
-  if (!localStorage.getItem("pasien_token")) return <Navigate to="/ibu/login" replace />;
   return <PasienLayout />;
 }
 

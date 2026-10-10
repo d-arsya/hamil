@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { UserRound, MessageCircle, UserPlus, KeyRound, Users, Save } from "lucide-react";
 import { toast } from "sonner";
 import api, { apiError } from "../lib/api";
@@ -15,11 +15,11 @@ export default function Profil() {
   const [pw, setPw] = useState({ lama: "", baru: "", konfirmasi: "" });
   const [saving, setSaving] = useState("");
 
-  const loadUsers = () => api.get("/auth/users").then((r) => setUsers(r.data)).catch(() => {});
+  const loadUsers = useCallback(() => api.get("/auth/users").then((r) => setUsers(r.data)).catch(() => {}), []);
   useEffect(() => {
     api.get("/pengaturan").then((r) => setPeng(r.data)).catch(() => {});
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   const savePengaturan = async () => {
     setSaving("pengaturan");

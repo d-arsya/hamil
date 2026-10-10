@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, MessageCircle, Pencil, Trash2, Eye, Gift, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -31,10 +31,10 @@ export default function Patients() {
   const [editPatient, setEditPatient] = useState(null);
   const [waPatient, setWaPatient] = useState(null);
 
-  const load = () => api.get("/patients").then((r) => setPatients(r.data));
+  const load = useCallback(() => api.get("/patients").then((r) => setPatients(r.data)), []);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const filtered = useMemo(() => {
     if (!patients) return [];

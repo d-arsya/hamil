@@ -103,6 +103,7 @@ class TestAuth:
         assert "password_hash" not in d
 
     def test_me_without_token(self, api_client):
+        api_client.cookies.clear()
         r = api_client.get(f"{BASE_URL}/api/auth/me", timeout=30)
         assert r.status_code == 401
 
@@ -132,6 +133,7 @@ class TestAuthProtection:
         ("delete", "/api/patients/xyz"),
     ])
     def test_requires_auth(self, api_client, method, path):
+        api_client.cookies.clear()
         r = getattr(api_client, method)(f"{BASE_URL}{path}", json={}, timeout=30)
         assert r.status_code == 401, f"{path} -> {r.status_code}"
 
@@ -336,16 +338,27 @@ class TestPersalinan:
 
 # ---------- SECURITY: brute force ----------
 class TestBruteForce:
+    BF_CREDS = {"username": "test_bruteforce_user", "password": "Brute#Test123"}
+
     def test_lockout_after_5_failures(self, api_client, test_credentials):
+        import subprocess
+        # bersihkan dulu + pakai user khusus agar akun admin tidak ikut terkunci saat suite paralel
+        subprocess.run(["mongosh", os.environ.get("DB_NAME", "test_database"), "--quiet",
+                        "--eval", 'db.login_attempts.deleteMany({"username": "test_bruteforce_user"})'], capture_output=True, check=False)
+        ok0 = api_client.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
+        assert ok0.status_code == 200, ok0.text
+        ah = {"Authorization": f"Bearer {ok0.json()['token']}"}
+        api_client.post(f"{BASE_URL}/api/auth/users",
+                        json={"username": self.BF_CREDS["username"], "nama": "Test Brute Force", "password": self.BF_CREDS["password"]},
+                        headers=ah, timeout=30)
         codes = []
         for _ in range(6):
             r = api_client.post(f"{BASE_URL}/api/auth/login",
-                                json={"username": test_credentials["username"], "password": "wrong-bf"}, timeout=30)
+                                json={"username": self.BF_CREDS["username"], "password": "wrong-bf"}, timeout=30)
             codes.append(r.status_code)
         assert 429 in codes, f"no rate limit/lockout, codes={codes}"
-        # cleanup: never leave the admin account locked out for the next agent/user
-        import subprocess
+        # cleanup: never leave the account locked out for the next agent/user
         subprocess.run(["mongosh", os.environ.get("DB_NAME", "test_database"), "--quiet",
-                        "--eval", "db.login_attempts.deleteMany({})"], capture_output=True, check=False)
-        ok = api_client.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
-        assert ok.status_code == 200, f"admin still locked after cleanup: {ok.status_code}"
+                        "--eval", 'db.login_attempts.deleteMany({"username": "test_bruteforce_user"})'], capture_output=True, check=False)
+        ok = api_client.post(f"{BASE_URL}/api/auth/login", json=self.BF_CREDS, timeout=30)
+        assert ok.status_code == 200, f"user still locked after cleanup: {ok.status_code}"

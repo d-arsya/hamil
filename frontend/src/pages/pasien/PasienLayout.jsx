@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Outlet, NavLink, useNavigate, useOutletContext } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Outlet, NavLink, useOutletContext } from "react-router-dom";
 import { Home, Activity, Pill, Baby, Menu as MenuIcon, HeartPulse } from "lucide-react";
 import pasienApi from "../../lib/pasienApi";
 import { DISCLAIMER } from "../../lib/konten";
@@ -17,17 +17,11 @@ const NAV = [
 
 export default function PasienLayout() {
   const [me, setMe] = useState(null);
-  const navigate = useNavigate();
 
-  const load = () => pasienApi.get("/pasien/me").then((r) => setMe(r.data)).catch(() => {});
+  const load = useCallback(() => pasienApi.get("/pasien/me").then((r) => setMe(r.data)).catch(() => {}), []);
   useEffect(() => {
-    if (!localStorage.getItem("pasien_token")) {
-      navigate("/ibu/login");
-      return;
-    }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
   if (!me) {
     return (

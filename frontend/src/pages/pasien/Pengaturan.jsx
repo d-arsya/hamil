@@ -40,8 +40,12 @@ export default function Pengaturan() {
     toast.success("Pengingat diperbarui");
   };
 
-  const logout = () => {
-    localStorage.removeItem("pasien_token");
+  const logout = async () => {
+    try {
+      await pasienApi.post("/pasien/logout");
+    } catch {
+      // tetap lanjut keluar meski request gagal
+    }
     navigate("/ibu/login");
   };
 

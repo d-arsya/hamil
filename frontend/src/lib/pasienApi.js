@@ -1,19 +1,15 @@
 import axios from "axios";
 
-const pasienApi = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL}/api` });
-
-pasienApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("pasien_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+const pasienApi = axios.create({
+  baseURL: `${process.env.REACT_APP_BACKEND_URL}/api`,
+  withCredentials: true,
 });
 
 pasienApi.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 || err.response?.status === 403) {
-      localStorage.removeItem("pasien_token");
-      if (!window.location.pathname.startsWith("/ibu/login")) window.location.href = "/ibu/login";
+    if ((err.response?.status === 401 || err.response?.status === 403) && !window.location.pathname.startsWith("/ibu/login")) {
+      window.location.href = "/ibu/login";
     }
     return Promise.reject(err);
   }

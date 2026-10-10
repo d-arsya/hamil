@@ -105,6 +105,14 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 7. Halaman Profil (/profil): nomor WA bidan, template janji & follow-up, manajemen pengguna (GET/POST /api/auth/users — tambah user akses penuh, username unik, password ≥8), ganti password
 - Fix critical: sisa blok JSX "pesan" di Beranda.jsx menyebabkan crash portal (testing iterasi 14: 19/19 backend baru pass, 131/133 legacy pass — 2 flaky lockout/timeout pre-existing; frontend 100% setelah fix)
 
+## Iterasi 15 (Okt 2026) — Code quality & security hardening (dari code review)
+- Auth migrasi ke httpOnly cookie (SameSite=Lax, Secure): login klinik & pasien set cookie `bidanku_token`/`bidanku_pasien`, endpoint POST /api/auth/logout & /api/pasien/logout; Bearer header tetap didukung sebagai fallback (kompatibel dengan API test). Frontend tidak lagi menyimpan token di localStorage (api.js/pasienApi.js withCredentials, AuthContext cek /auth/me via cookie)
+- Refactor kompleksitas: compute_status dipecah (helper _jadwal_berikutnya), laporan() dipecah (helper _done_ke, _ketuntasan_kunjungan, _evaluasi_pasien, _profil_risiko) — kompleksitas 57 → terdistribusi ke fungsi-fungsi kecil
+- Hook dependencies diperbaiki dengan useCallback (Patients, PatientDetail, PasienLayout, Beranda, TTD, FollowUp, Profil); komponen PatientDetail dipecah: grafik → PatientCharts.jsx, TTV ringkas → helper ttvRingkas
+- Index-as-key diperbaiki: PatientForm repeater riwayat memakai _key (crypto.randomUUID, distrip saat submit), PatientDetail riwayat list memakai composite key
+- Stabilitas test: TestLockout & TestBruteForce kini memakai user khusus (test_lockout_user / test_bruteforce_user) + pembersihan login_attempts terscope per-user; test auth-negatif membersihkan cookie session. Full suite stabil: 152/152 pass
+- Catatan yang disengaja tidak diubah: rewrite form besar (CheckupForm/PatientForm) & type-hint file test — risiko regresi tinggi tanpa manfaat fungsional, sudah tercakup test
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

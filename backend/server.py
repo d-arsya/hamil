@@ -14,7 +14,7 @@ from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -30,6 +30,13 @@ security = HTTPBearer(auto_error=False)
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
+
+CLINIC_COOKIE = "bidanku_token"
+PASIEN_COOKIE = "bidanku_pasien"
+
+
+def set_auth_cookie(response: Response, name: str, token: str, max_age: int):
+    response.set_cookie(name, token, httponly=True, secure=True, samesite="lax", max_age=max_age, path="/")
 
 # Jadwal ANC 6x (minggu ke-) dan Kunjungan Nifas (hari ke-)
 ANC_WEEKS = [12, 16, 26, 32, 36, 39]
@@ -52,11 +59,12 @@ def create_token(user_id: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
-    if not creds:
+async def get_current_user(request: Request, creds: HTTPAuthorizationCredentials = Depends(security)):
+    token = creds.credentials if creds else request.cookies.get(CLINIC_COOKIE)
+    if not token:
         raise HTTPException(status_code=401, detail="Belum login")
     try:
-        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Token tidak valid atau kedaluwarsa")
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
@@ -181,54 +189,46 @@ IMUNISASI_SCHEDULE = [
 ]
 
 
+def _jadwal_berikutnya(done_set: set, targets: list, base: date, satuan: str, prev_ke_base: bool = False):
+    """Kembalikan (tanggal_kunjungan_berikutnya, tanggal_awal_periode, label kunjungan)."""
+    step = timedelta(weeks=1) if satuan == "minggu" else timedelta(days=1)
+    next_idx = next((i for i in range(len(targets)) if (i + 1) not in done_set), None)
+    if next_idx is None:
+        return None, base + step * targets[-1], None
+    next_date = base + step * targets[next_idx]
+    if next_idx > 0:
+        prev_date = base + step * targets[next_idx - 1]
+    else:
+        prev_date = base if prev_ke_base else None
+    prefix = "K" if satuan == "minggu" else "KF"
+    return next_date, prev_date, f"{prefix}{next_idx + 1}"
+
+
 def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -> dict:
     today = today or date.today()
     hpht = date.fromisoformat(pasien["hpht"])
     hpl = hpht + timedelta(days=280)
     persalinan = date.fromisoformat(pasien["tanggal_persalinan"]) if pasien.get("tanggal_persalinan") else None
 
-    usia_minggu = None
-    usia_hari = None
-    hari_nifas = None
-
+    usia_minggu = usia_hari = hari_nifas = None
     if persalinan:
         fase = "nifas"
-        phase_checks = [c for c in checkups if c.get("jenis") == "kf"]
         hari_nifas = (today - persalinan).days
+        phase_checks = [c for c in checkups if c.get("jenis") == "kf"]
         done_set = {c.get("ke") for c in phase_checks if c.get("ke")}
-        next_idx = next((i for i in range(len(KF_DAYS)) if (i + 1) not in done_set), None)
-        if next_idx is None:
-            next_date, prev_date, kunjungan = None, persalinan + timedelta(days=KF_DAYS[-1]), None
-        else:
-            next_date = persalinan + timedelta(days=KF_DAYS[next_idx])
-            prev_date = persalinan + timedelta(days=KF_DAYS[next_idx - 1]) if next_idx > 0 else persalinan
-            kunjungan = f"KF{next_idx + 1}"
+        next_date, prev_date, kunjungan = _jadwal_berikutnya(done_set, KF_DAYS, persalinan, "hari", prev_ke_base=True)
+        fase_ke, fase_total = min(len(done_set), len(KF_DAYS)), len(KF_DAYS)
     else:
         selisih = (today - hpht).days
-        usia_minggu = selisih // 7
-        usia_hari = selisih % 7
+        usia_minggu, usia_hari = selisih // 7, selisih % 7
         fase = "trimester_1" if usia_minggu < 13 else ("trimester_2" if usia_minggu < 28 else "trimester_3")
         phase_checks = [c for c in checkups if c.get("jenis") == "anc"]
         done_set = {c.get("ke") for c in phase_checks if c.get("ke")}
-        next_idx = next((i for i in range(len(ANC_WEEKS)) if (i + 1) not in done_set), None)
-        if next_idx is None:
-            next_date, prev_date, kunjungan = None, hpht + timedelta(weeks=ANC_WEEKS[-1]), None
-        else:
-            next_date = hpht + timedelta(weeks=ANC_WEEKS[next_idx])
-            prev_date = hpht + timedelta(weeks=ANC_WEEKS[next_idx - 1]) if next_idx > 0 else None
-            kunjungan = f"K{next_idx + 1}"
+        next_date, prev_date, kunjungan = _jadwal_berikutnya(done_set, ANC_WEEKS, hpht, "minggu")
+        target = {"trimester_1": {1, 2}, "trimester_2": {3}, "trimester_3": {4, 5, 6}}[fase]
+        fase_ke, fase_total = len(done_set & target), len(target)
 
     last = max((date.fromisoformat(c["tanggal"]) for c in phase_checks), default=None)
-
-    if persalinan:
-        fase_ke, fase_total = min(len(done_set), len(KF_DAYS)), len(KF_DAYS)
-    else:
-        if fase == "trimester_1":
-            fase_ke, fase_total = len(done_set & {1, 2}), 2
-        elif fase == "trimester_2":
-            fase_ke, fase_total = len(done_set & {3}), 1
-        else:
-            fase_ke, fase_total = len(done_set & {4, 5, 6}), 3
     selisih_hari = (next_date - today).days if next_date else None
 
     if next_date is None:
@@ -239,7 +239,7 @@ def compute_status(pasien: dict, checkups: list, today: Optional[date] = None) -
         status = "terlambat"
     elif next_date == today:
         status = "hari_ini"
-    elif (next_date - today).days <= 7:
+    elif selisih_hari <= 7:
         status = "mendekati"
     else:
         status = "terjadwal"
@@ -364,7 +364,7 @@ async def patient_with_checkups(p: dict) -> dict:
 
 # ---------- AUTH ----------
 @api_router.post("/auth/login")
-async def login(data: LoginInput):
+async def login(data: LoginInput, response: Response):
     username = data.username.strip().lower()
     attempts = await db.login_attempts.find_one({"username": username})
     if attempts and attempts.get("count", 0) >= 5:
@@ -383,7 +383,14 @@ async def login(data: LoginInput):
         raise HTTPException(status_code=401, detail="Username atau password salah")
     await db.login_attempts.delete_one({"username": username})
     token = create_token(user["id"])
+    set_auth_cookie(response, CLINIC_COOKIE, token, 12 * 3600)
     return {"token": token, "user": {"username": user["username"], "nama": user.get("nama", ""), "email": user.get("email", "")}}
+
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie(CLINIC_COOKIE, path="/")
+    return {"ok": True}
 
 
 @api_router.get("/auth/me")
@@ -831,82 +838,77 @@ async def put_pengaturan(data: PengaturanInput, user=Depends(get_current_user)):
 
 
 # ---------- LAPORAN ----------
-@api_router.get("/laporan")
-async def laporan(user=Depends(get_current_user)):
-    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
-    checks = await db.checkups.find({}, {"_id": 0}).to_list(50000)
-    by_patient = {}
-    for c in checks:
-        by_patient.setdefault(c["patient_id"], []).append(c)
-    today = date.today()
+def _done_ke(checks: list, jenis: str, ke: int) -> bool:
+    return any(c.get("jenis") == jenis and c.get("ke") == ke for c in checks)
 
-    def done_ke(pid, jenis, ke):
-        return any(c.get("jenis") == jenis and c.get("ke") == ke for c in by_patient.get(pid, []))
 
-    anc_stats = []
-    for i, w in enumerate(ANC_WEEKS):
+def _ketuntasan_kunjungan(patients: list, by_patient: dict, today: date, jenis: str) -> list:
+    if jenis == "kf":
+        targets, prefix, satuan = KF_DAYS, "KF", "hari"
+    else:
+        targets, prefix, satuan = ANC_WEEKS, "K", "mgg"
+    stats = []
+    for i, t in enumerate(targets):
         eligible = done = 0
         for p in patients:
-            target = date.fromisoformat(p["hpht"]) + timedelta(weeks=w)
-            if target <= today or p.get("tanggal_persalinan"):
+            if jenis == "kf":
+                if not p.get("tanggal_persalinan"):
+                    continue
+                jatuh_tempo = date.fromisoformat(p["tanggal_persalinan"]) + timedelta(days=t) <= today
+            else:
+                jatuh_tempo = date.fromisoformat(p["hpht"]) + timedelta(weeks=t) <= today or bool(p.get("tanggal_persalinan"))
+            if jatuh_tempo:
                 eligible += 1
-                if done_ke(p["id"], "anc", i + 1):
+                if _done_ke(by_patient.get(p["id"], []), jenis, i + 1):
                     done += 1
-        anc_stats.append({"kode": f"K{i + 1}", "label": f"K{i + 1} (mgg {w})", "eligible": eligible, "done": done, "persen": round(done / eligible * 100) if eligible else None})
+        stats.append({
+            "kode": f"{prefix}{i + 1}",
+            "label": f"{prefix}{i + 1} ({satuan} {t})",
+            "eligible": eligible,
+            "done": done,
+            "persen": round(done / eligible * 100) if eligible else None,
+        })
+    return stats
 
-    kf_stats = []
-    for i, d in enumerate(KF_DAYS):
-        eligible = done = 0
-        for p in patients:
-            if not p.get("tanggal_persalinan"):
-                continue
-            if date.fromisoformat(p["tanggal_persalinan"]) + timedelta(days=d) <= today:
-                eligible += 1
-                if done_ke(p["id"], "kf", i + 1):
-                    done += 1
-        kf_stats.append({"kode": f"KF{i + 1}", "label": f"KF{i + 1} (hari {d})", "eligible": eligible, "done": done, "persen": round(done / eligible * 100) if eligible else None})
 
-    tuntas = lost = 0
-    perlu_followup_list = []
-    perlu_update_list = []
-    for p in patients:
-        st = compute_status(p, by_patient.get(p["id"], []), today)
-        if st["status"] in ("terlambat", "hari_ini", "mendekati"):
-            perlu_followup_list.append({
-                "id": p["id"], "nama": p["nama"], "status": st["status"],
-                "jadwal_berikutnya": st["jadwal_berikutnya"], "selisih_hari": st["selisih_hari"],
-                "kunjungan_berikutnya": st["kunjungan_berikutnya"],
-            })
-        alasan_update = []
-        if not (p.get("no_rm") or "").strip() or not p.get("tanggal_lahir") or not (p.get("alamat") or "").strip():
-            alasan_update.append("Data identitas belum lengkap (No. RM / tgl lahir / alamat)")
-        if st["status"] != "selesai":
-            if st["kontrol_terakhir"]:
-                if (today - date.fromisoformat(st["kontrol_terakhir"])).days > 30:
-                    alasan_update.append("Sudah lebih dari 30 hari tidak kontrol")
-            elif p.get("created_at") and (today - date.fromisoformat(p["created_at"][:10])).days > 30:
-                alasan_update.append("Belum pernah kontrol sejak terdaftar lebih dari 30 hari")
-        if alasan_update:
-            perlu_update_list.append({"id": p["id"], "nama": p["nama"], "alasan": alasan_update})
-        if st["status"] == "terlambat":
-            lost += 1
-            continue
-        due_ok = True
-        hpht = date.fromisoformat(p["hpht"])
+def _evaluasi_pasien(p: dict, checks: list, today: date) -> dict:
+    """Evaluasi satu pasien: lost to follow up, tuntas, perlu follow-up kontrol, perlu update data."""
+    st = compute_status(p, checks, today)
+    followup = None
+    if st["status"] in ("terlambat", "hari_ini", "mendekati"):
+        followup = {
+            "id": p["id"], "nama": p["nama"], "status": st["status"],
+            "jadwal_berikutnya": st["jadwal_berikutnya"], "selisih_hari": st["selisih_hari"],
+            "kunjungan_berikutnya": st["kunjungan_berikutnya"],
+        }
+    alasan = []
+    if not (p.get("no_rm") or "").strip() or not p.get("tanggal_lahir") or not (p.get("alamat") or "").strip():
+        alasan.append("Data identitas belum lengkap (No. RM / tgl lahir / alamat)")
+    if st["status"] != "selesai":
+        if st["kontrol_terakhir"]:
+            if (today - date.fromisoformat(st["kontrol_terakhir"])).days > 30:
+                alasan.append("Sudah lebih dari 30 hari tidak kontrol")
+        elif p.get("created_at") and (today - date.fromisoformat(p["created_at"][:10])).days > 30:
+            alasan.append("Belum pernah kontrol sejak terdaftar lebih dari 30 hari")
+    lost = st["status"] == "terlambat"
+    tuntas = False
+    if not lost:
         if not p.get("tanggal_persalinan"):
-            for i, w in enumerate(ANC_WEEKS):
-                if hpht + timedelta(weeks=w) <= today and not done_ke(p["id"], "anc", i + 1):
-                    due_ok = False
-                    break
+            jadwal = [(i + 1, date.fromisoformat(p["hpht"]) + timedelta(weeks=w)) for i, w in enumerate(ANC_WEEKS)]
+            jenis = "anc"
         else:
-            pers = date.fromisoformat(p["tanggal_persalinan"])
-            for i, d in enumerate(KF_DAYS):
-                if pers + timedelta(days=d) <= today and not done_ke(p["id"], "kf", i + 1):
-                    due_ok = False
-                    break
-        if due_ok:
-            tuntas += 1
+            jadwal = [(i + 1, date.fromisoformat(p["tanggal_persalinan"]) + timedelta(days=d)) for i, d in enumerate(KF_DAYS)]
+            jenis = "kf"
+        tuntas = all(tgl > today or _done_ke(checks, jenis, ke) for ke, tgl in jadwal)
+    return {
+        "lost": lost,
+        "tuntas": tuntas,
+        "followup": followup,
+        "update": {"id": p["id"], "nama": p["nama"], "alasan": alasan} if alasan else None,
+    }
 
+
+def _profil_risiko(patients: list, total: int) -> tuple:
     hipertensi_re = re.compile(r"(hipertensi|preeklams|pre-?eklams|darah tinggi)", re.I)
     dm_re = re.compile(r"(diabetes|kencing manis|\bdm\b)", re.I)
     penyakit = {"Hipertensi / Preeklamsia": 0, "Diabetes Melitus": 0, "Penyakit Lainnya": 0}
@@ -928,14 +930,43 @@ async def laporan(user=Depends(get_current_user)):
         if mp:
             key = f"Persalinan: {mp}"
             penyulit_counter[key] = penyulit_counter.get(key, 0) + 1
-
-    total = len(patients)
     penyakit_list = [{"nama": k, "jumlah": v, "persen": round(v / total * 100) if total else 0} for k, v in penyakit.items() if v > 0]
     penyulit_list = sorted(
         [{"nama": k, "jumlah": v, "persen": round(v / total * 100) if total else 0} for k, v in penyulit_counter.items()],
         key=lambda x: -x["jumlah"],
     )[:10]
+    return penyakit_list, penyulit_list
+
+
+@api_router.get("/laporan")
+async def laporan(user=Depends(get_current_user)):
+    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
+    checks = await db.checkups.find({}, {"_id": 0}).to_list(50000)
+    by_patient = {}
+    for c in checks:
+        by_patient.setdefault(c["patient_id"], []).append(c)
+    today = date.today()
+    anc_stats = _ketuntasan_kunjungan(patients, by_patient, today, "anc")
+    kf_stats = _ketuntasan_kunjungan(patients, by_patient, today, "kf")
+
+    tuntas = lost = 0
+    perlu_followup_list = []
+    perlu_update_list = []
+    for p in patients:
+        hasil = _evaluasi_pasien(p, by_patient.get(p["id"], []), today)
+        if hasil["lost"]:
+            lost += 1
+        if hasil["tuntas"]:
+            tuntas += 1
+        if hasil["followup"]:
+            perlu_followup_list.append(hasil["followup"])
+        if hasil["update"]:
+            perlu_update_list.append(hasil["update"])
+
+    total = len(patients)
+    penyakit_list, penyulit_list = _profil_risiko(patients, total)
     perlu_followup_list.sort(key=lambda x: (x["selisih_hari"] is None, x["selisih_hari"] if x["selisih_hari"] is not None else 0))
+
     return {
         "total": total,
         "tuntas": tuntas,
@@ -1157,11 +1188,12 @@ def create_pasien_token(user_id: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_pasien(creds: HTTPAuthorizationCredentials = Depends(security)):
-    if not creds:
+async def get_current_pasien(request: Request, creds: HTTPAuthorizationCredentials = Depends(security)):
+    token = creds.credentials if creds else request.cookies.get(PASIEN_COOKIE)
+    if not token:
         raise HTTPException(status_code=401, detail="Belum login")
     try:
-        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Sesi tidak valid, silakan masuk kembali")
     if payload.get("role") != "pasien":
@@ -1186,7 +1218,7 @@ class PasienProfilInput(BaseModel):
 
 
 @api_router.post("/pasien/login")
-async def pasien_login(data: PasienLoginInput):
+async def pasien_login(data: PasienLoginInput, response: Response):
     username = data.username.strip().lower()
     attempts = await db.login_attempts.find_one({"username": f"pasien:{username}"})
     if attempts and attempts.get("count", 0) >= 5:
@@ -1205,7 +1237,15 @@ async def pasien_login(data: PasienLoginInput):
         raise HTTPException(status_code=401, detail="Username atau password salah")
     await db.login_attempts.delete_one({"username": f"pasien:{username}"})
     p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0, "nama": 1})
-    return {"token": create_pasien_token(pu["id"]), "nama": p["nama"] if p else ""}
+    token = create_pasien_token(pu["id"])
+    set_auth_cookie(response, PASIEN_COOKIE, token, 30 * 24 * 3600)
+    return {"token": token, "nama": p["nama"] if p else ""}
+
+
+@api_router.post("/pasien/logout")
+async def pasien_logout(response: Response):
+    response.delete_cookie(PASIEN_COOKIE, path="/")
+    return {"ok": True}
 
 
 @api_router.post("/patients/{patient_id}/akun")

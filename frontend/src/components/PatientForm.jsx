@@ -43,7 +43,7 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? { ...empty, ...initial } : empty);
+      setForm(initial ? { ...empty, ...initial, riwayat_kehamilan: (initial.riwayat_kehamilan || []).map((r) => ({ ...r, _key: crypto.randomUUID() })) } : empty);
       api.get("/options/penyulit").then((r) => setPenyulitCustoms(r.data.custom || [])).catch(() => {});
     }
   }, [open, initial]);
@@ -55,7 +55,7 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
   const addRiwayat = () =>
     setForm((f) => ({
       ...f,
-      riwayat_kehamilan: [...(f.riwayat_kehamilan || []), { tahun: "", tempat: "", penolong: "", hasil: "Lahir hidup", cara_lahir: "", penyulit: "Tidak ada" }],
+      riwayat_kehamilan: [...(f.riwayat_kehamilan || []), { _key: crypto.randomUUID(), tahun: "", tempat: "", penolong: "", hasil: "Lahir hidup", cara_lahir: "", penyulit: "Tidak ada" }],
     }));
   const setRiwayat = (i, k) => (e) =>
     setForm((f) => {
@@ -76,6 +76,7 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
     try {
       const payload = {
         ...form,
+        riwayat_kehamilan: (form.riwayat_kehamilan || []).map(({ _key, ...r }) => r),
         tanggal_lahir: form.tanggal_lahir || null,
         gravida: parseInt(form.gravida) || 1,
         para: parseInt(form.para) || 0,
@@ -147,7 +148,7 @@ export default function PatientForm({ open, onClose, onSaved, initial }) {
           )}
           <div className="space-y-2">
             {(form.riwayat_kehamilan || []).map((r, i) => (
-              <div key={i} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2" data-testid={`riwayat-row-${i}`}>
+              <div key={r._key} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2" data-testid={`riwayat-row-${i}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-500">Riwayat #{i + 1}</span>
                   <button type="button" data-testid={`riwayat-delete-${i}`} onClick={() => delRiwayat(i)} className="text-xs font-semibold text-red-600 hover:underline">

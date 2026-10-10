@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Activity, Pill, Baby, AlertTriangle, CalendarClock, CheckCircle2, Circle, MessageCircle } from "lucide-react";
 import pasienApi from "../../lib/pasienApi";
@@ -16,11 +16,14 @@ export default function Beranda() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     pasienApi.get("/pasien/ttd").then((r) => setTtdToday(r.data.find((t) => t.tanggal === today) || null)).catch(() => {});
     pasienApi.get("/pasien/pemantauan?limit=1").then((r) => setPantauToday(r.data.find((x) => x.tanggal === today) || null)).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [today]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const minggu = p.usia_minggu ?? 0;
   const progress = Math.min(Math.round((minggu / 40) * 100), 100);

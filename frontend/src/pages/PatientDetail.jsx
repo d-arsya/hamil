@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2, Gift, Check, Smartphone, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import api, { apiError } from "../lib/api";
 import StatusBadge, { FaseBadge, RiskBadges, riskNameColor } from "../components/StatusBadge";
 import PatientForm from "../components/PatientForm";
@@ -12,6 +11,7 @@ import CheckupForm from "../components/CheckupForm";
 import WaReminder from "../components/WaReminder";
 import Timeline from "../components/Timeline";
 import PemantauanPasien from "../components/PemantauanPasien";
+import PatientCharts from "../components/PatientCharts";
 import ImunisasiPanel from "../components/ImunisasiPanel";
 import ImunisasiTTPanel from "../components/ImunisasiTTPanel";
 import Modal from "../components/Modal";
@@ -29,6 +29,16 @@ function InfoItem({ label, value }) {
   );
 }
 
+const ttvRingkas = (c) =>
+  [
+    c.spo2 != null && `SpO2 ${c.spo2}%`,
+    c.suhu != null && `${c.suhu}°C`,
+    c.nadi != null && `N ${c.nadi}`,
+    c.rr != null && `RR ${c.rr}`,
+    c.lila != null && `LiLa ${c.lila}`,
+    c.tinggi_badan != null && `TB ${c.tinggi_badan}`,
+  ].filter(Boolean).join(" · ");
+
 export default function PatientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -45,8 +55,8 @@ export default function PatientDetail() {
   const [akun, setAkun] = useState(null);
   const [akunBaru, setAkunBaru] = useState(null);
 
-  const loadAkun = () => api.get(`/patients/${id}/akun`).then((r) => setAkun(r.data)).catch(() => {});
-  useEffect(() => { loadAkun(); }, [id]);
+  const loadAkun = useCallback(() => api.get(`/patients/${id}/akun`).then((r) => setAkun(r.data)).catch(() => {}), [id]);
+  useEffect(() => { loadAkun(); }, [loadAkun]);
 
   const buatAkun = async () => {
     if (akun?.ada && !window.confirm("Reset password akun pasien? Password lama tidak bisa dipakai lagi.")) return;
@@ -59,11 +69,10 @@ export default function PatientDetail() {
     }
   };
 
-  const load = () => api.get(`/patients/${id}`).then((r) => setData(r.data)).catch(() => navigate("/pasien"));
+  const load = useCallback(() => api.get(`/patients/${id}`).then((r) => setData(r.data)).catch(() => navigate("/pasien")), [id, navigate]);
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [load]);
 
   if (!data) return <div className="text-sm text-slate-400 animate-pulse" data-testid="patient-detail-loading">Memuat data pasien...</div>;
 
@@ -118,11 +127,6 @@ export default function PatientDetail() {
       toast.error("Gagal memperbarui status kupon");
     }
   };
-
-  const chartData = checkups.map((c) => ({
-    ...c,
-    label: fmtDate(c.tanggal),
-  }));
 
   return (
     <div data-testid="patient-detail-page">
@@ -300,7 +304,7 @@ export default function PatientDetail() {
               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Riwayat Kehamilan Sebelumnya</div>
               <div className="space-y-1.5" data-testid="riwayat-list">
                 {p.riwayat_kehamilan.map((r, i) => (
-                  <div key={i} className="text-xs text-slate-600 flex flex-wrap gap-x-2" data-testid={`riwayat-item-${i}`}>
+                  <div key={`${r.tahun}-${r.tempat}-${r.penolong}-${r.hasil}-${r.penyulit}`} className="text-xs text-slate-600 flex flex-wrap gap-x-2" data-testid={`riwayat-item-${i}`}>
                     <span className="font-semibold">{r.tahun || "-"}</span>
                     <span>· {r.hasil || "-"}</span>
                     {r.cara_lahir && <span>· {r.cara_lahir}</span>}
@@ -334,43 +338,7 @@ export default function PatientDetail() {
 
       <PemantauanPasien patientId={p.id} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <div className={cardCls}>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Grafik Tekanan Darah</h3>
-          {chartData.filter((c) => c.sistolik).length === 0 ? (
-            <div className="h-[220px] flex items-center justify-center text-xs text-slate-400" data-testid="bp-chart-empty">Belum ada data tekanan darah</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="label" fontSize={10} tickLine={false} />
-                <YAxis fontSize={10} domain={[40, 180]} tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="sistolik" name="Sistolik" stroke="#C02650" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                <Line type="monotone" dataKey="diastolik" name="Diastolik" stroke="#0F172A" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-        <div className={cardCls}>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Grafik Berat Badan</h3>
-          {chartData.filter((c) => c.berat_badan).length === 0 ? (
-            <div className="h-[220px] flex items-center justify-center text-xs text-slate-400" data-testid="weight-chart-empty">Belum ada data berat badan</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="label" fontSize={10} tickLine={false} />
-                <YAxis fontSize={10} domain={["auto", "auto"]} tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="berat_badan" name="Berat Badan (kg)" stroke="#C02650" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
+      <PatientCharts checkups={checkups} />
 
       <ImunisasiPanel patient={p} onRemind={() => { setWaTemplate("imunisasi"); setWaOpen(true); }} />
       {p.fase !== "nifas" && <ImunisasiTTPanel patient={p} />}
@@ -413,17 +381,8 @@ export default function PatientDetail() {
                   </td>
                   <td className="px-5 py-3 text-slate-600">
                     <div>{c.sistolik && c.diastolik ? `${c.sistolik}/${c.diastolik}` : "-"}</div>
-                    {(c.spo2 || c.suhu || c.nadi || c.rr || c.lila || c.tinggi_badan) && (
-                      <div className="text-[10px] text-slate-400 leading-relaxed">
-                        {[
-                          c.spo2 != null && `SpO2 ${c.spo2}%`,
-                          c.suhu != null && `${c.suhu}°C`,
-                          c.nadi != null && `N ${c.nadi}`,
-                          c.rr != null && `RR ${c.rr}`,
-                          c.lila != null && `LiLa ${c.lila}`,
-                          c.tinggi_badan != null && `TB ${c.tinggi_badan}`,
-                        ].filter(Boolean).join(" · ")}
-                      </div>
+                    {ttvRingkas(c) && (
+                      <div className="text-[10px] text-slate-400 leading-relaxed">{ttvRingkas(c)}</div>
                     )}
                   </td>
                   <td className="px-5 py-3 text-slate-600">{c.berat_badan ?? "-"}</td>

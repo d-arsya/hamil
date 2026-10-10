@@ -27,10 +27,11 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or fe["REACT_APP_BACKEND_URL
 CREDS = {"username": "admin", "password": ADMIN_PASSWORD}
 
 
-def clear_login_attempts():
+def clear_login_attempts(username=None):
+    filt = {} if username is None else f'{{"username": "{username}"}}'
     subprocess.run(
         ["mongosh", os.environ.get("DB_NAME", "test_database"), "--quiet",
-         "--eval", "db.login_attempts.deleteMany({})"],
+         "--eval", f"db.login_attempts.deleteMany({filt})"],
         capture_output=True, check=False,
     )
 
@@ -161,27 +162,37 @@ class TestStatusPhase:
 
 # ---------- lockout (must run last / cleans up) ----------
 class TestLockout:
+    LOCK_CREDS = {"username": "test_lockout_user", "password": "Lockout#Test123"}
+
     def test_lockout_then_correct_password_rejected(self):
-        clear_login_attempts()
+        clear_login_attempts(self.LOCK_CREDS["username"])
+        # Pakai user khusus agar akun admin tidak terkunci saat test berjalan paralel
+        admin = requests.post(f"{BASE_URL}/api/auth/login", json=CREDS, timeout=30)
+        assert admin.status_code == 200, admin.text
+        ah = {"Authorization": f"Bearer {admin.json()['token']}"}
+        requests.post(f"{BASE_URL}/api/auth/users",
+                      json={"username": self.LOCK_CREDS["username"], "nama": "Test Lockout", "password": self.LOCK_CREDS["password"]},
+                      headers=ah, timeout=30)
         s = requests.Session()
         codes = []
         for _ in range(5):
             codes.append(s.post(f"{BASE_URL}/api/auth/login",
-                                json={"username": "admin", "password": "salah-bf"}, timeout=30).status_code)
+                                json={"username": self.LOCK_CREDS["username"], "password": "salah-bf"}, timeout=30).status_code)
         assert codes[:5] == [401] * 5, codes
         # 6th wrong attempt -> 429
-        r6 = s.post(f"{BASE_URL}/api/auth/login", json={"username": "admin", "password": "salah-bf"}, timeout=30)
+        r6 = s.post(f"{BASE_URL}/api/auth/login", json={"username": self.LOCK_CREDS["username"], "password": "salah-bf"}, timeout=30)
         assert r6.status_code == 429, f"expected 429 got {r6.status_code}"
         assert "Terlalu banyak percobaan login" in r6.json()["detail"]
         # correct password also blocked while locked
-        rc = s.post(f"{BASE_URL}/api/auth/login", json=CREDS, timeout=30)
+        rc = s.post(f"{BASE_URL}/api/auth/login", json=self.LOCK_CREDS, timeout=30)
         assert rc.status_code == 429, f"correct password should be blocked during lockout, got {rc.status_code}"
         clear_login_attempts()
-        # after clearing, admin can log in again
-        ok = s.post(f"{BASE_URL}/api/auth/login", json=CREDS, timeout=30)
+        # after clearing, user can log in again
+        ok = s.post(f"{BASE_URL}/api/auth/login", json=self.LOCK_CREDS, timeout=30)
         assert ok.status_code == 200, ok.text
 
     def test_teardown_login_attempts_clean(self):
-        clear_login_attempts()
+        clear_login_attempts("admin")
+        clear_login_attempts(self.LOCK_CREDS["username"])
         r = requests.post(f"{BASE_URL}/api/auth/login", json=CREDS, timeout=30)
         assert r.status_code == 200

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BellRing, Check, MessageCircle, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -16,11 +16,11 @@ export default function FollowUp() {
   const [editTemplate, setEditTemplate] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const load = () => api.get("/followup").then((r) => setData(r.data));
+  const load = useCallback(() => api.get("/followup").then((r) => setData(r.data)), []);
   useEffect(() => {
     load();
     api.get("/pengaturan").then((r) => setPeng(r.data)).catch(() => {});
-  }, []);
+  }, [load]);
 
   if (!data) return <div className="text-sm text-slate-400 animate-pulse" data-testid="followup-loading">Memuat daftar follow-up...</div>;
 

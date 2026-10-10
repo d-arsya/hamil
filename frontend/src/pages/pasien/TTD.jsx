@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pill, Flame } from "lucide-react";
 import { toast } from "sonner";
 import pasienApi, { pasienError } from "../../lib/pasienApi";
@@ -14,8 +14,8 @@ export default function TTD() {
   const [editCustom, setEditCustom] = useState("");
   const today = new Date().toISOString().slice(0, 10);
 
-  const load = () => pasienApi.get("/pasien/ttd").then((r) => setRecords(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => pasienApi.get("/pasien/ttd").then((r) => setRecords(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const byDate = useMemo(() => Object.fromEntries((records || []).map((r) => [r.tanggal, r])), [records]);
   const todayRec = byDate[today];

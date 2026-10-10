@@ -8,26 +8,24 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     api
       .get("/auth/me")
       .then((r) => setUser(r.data))
-      .catch(() => localStorage.removeItem("token"))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (username, password) => {
     const { data } = await api.post("/auth/login", { username, password });
-    localStorage.setItem("token", data.token);
     setUser(data.user);
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // cookie dibersihkan server bila memungkinkan; tetap lanjut keluar
+    }
     setUser(null);
   };
 
