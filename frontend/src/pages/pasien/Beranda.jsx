@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Pill, Baby, AlertTriangle, CalendarClock, CheckCircle2, Circle } from "lucide-react";
+import { Activity, Pill, Baby, AlertTriangle, CalendarClock, CheckCircle2, Circle, MessageCircle } from "lucide-react";
 import pasienApi from "../../lib/pasienApi";
 import { usePasien } from "./PasienLayout";
 import { fmtDate, usiaLabel } from "../../lib/utils-id";
@@ -13,14 +13,12 @@ export default function Beranda() {
   const p = me.pasien;
   const [ttdToday, setTtdToday] = useState(null);
   const [pantauToday, setPantauToday] = useState(null);
-  const [pesan, setPesan] = useState([]);
 
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     pasienApi.get("/pasien/ttd").then((r) => setTtdToday(r.data.find((t) => t.tanggal === today) || null)).catch(() => {});
     pasienApi.get("/pasien/pemantauan?limit=1").then((r) => setPantauToday(r.data.find((x) => x.tanggal === today) || null)).catch(() => {});
-    pasienApi.get("/pasien/edukasi-klinik").then((r) => setPesan(r.data.pesan.slice(-3))).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,6 +113,16 @@ export default function Beranda() {
           </div>
         </div>
       )}
+
+      <Link to="/ibu/janji" data-testid="beranda-janji-link" className={`flex items-center gap-3 ${card} !py-4`}>
+        <div className="w-10 h-10 rounded-2xl bg-[#E8F8EE] flex items-center justify-center shrink-0">
+          <MessageCircle className="w-5 h-5 text-[#128C4A]" />
+        </div>
+        <div className="text-sm">
+          <b className="text-slate-900">Buat Janji Kontrol</b>
+          <div className="text-xs text-slate-500">Hubungi bidan via WhatsApp, sekali klik</div>
+        </div>
+      </Link>
 
       <div className={card}>
         <h2 className="text-sm font-bold text-slate-900 mb-1">Edukasi untuk Ibu</h2>

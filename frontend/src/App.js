@@ -12,8 +12,11 @@ const Patients = lazy(() => import("./pages/Patients"));
 const PatientDetail = lazy(() => import("./pages/PatientDetail"));
 const Edukasi = lazy(() => import("./pages/Edukasi"));
 const Laporan = lazy(() => import("./pages/Laporan"));
+const FollowUp = lazy(() => import("./pages/FollowUp"));
+const Profil = lazy(() => import("./pages/Profil"));
 const PasienLayout = lazy(() => import("./pages/pasien/PasienLayout"));
 const Beranda = lazy(() => import("./pages/pasien/Beranda"));
+const Janji = lazy(() => import("./pages/pasien/Janji"));
 const Pemantauan = lazy(() => import("./pages/pasien/Pemantauan"));
 const Mingguan = lazy(() => import("./pages/pasien/Mingguan"));
 const TTD = lazy(() => import("./pages/pasien/TTD"));
@@ -59,6 +62,7 @@ function App() {
           <Route path="/ibu/login" element={<PasienLogin />} />
           <Route element={<PasienProtected />}>
             <Route path="/ibu" element={<Beranda />} />
+            <Route path="/ibu/janji" element={<Janji />} />
             <Route path="/ibu/pantau" element={<Pemantauan />} />
             <Route path="/ibu/mingguan" element={<Mingguan />} />
             <Route path="/ibu/ttd" element={<TTD />} />
@@ -76,6 +80,8 @@ function App() {
             <Route path="/pasien/:id" element={<PatientDetail />} />
             <Route path="/edukasi" element={<Edukasi />} />
             <Route path="/laporan" element={<Laporan />} />
+            <Route path="/followup" element={<FollowUp />} />
+            <Route path="/profil" element={<Profil />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

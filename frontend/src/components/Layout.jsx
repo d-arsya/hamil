@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Menu, X, LogOut, HeartPulse, BookOpen, BarChart3, KeyRound } from "lucide-react";
+import { LayoutDashboard, Users, Menu, X, LogOut, HeartPulse, BookOpen, BarChart3, KeyRound, BellRing, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import api, { apiError } from "../lib/api";
@@ -11,6 +11,8 @@ const navItems = [
   { to: "/pasien", label: "Daftar Pasien", icon: Users, testid: "nav-pasien" },
   { to: "/edukasi", label: "Edukasi", icon: BookOpen, testid: "nav-edukasi" },
   { to: "/laporan", label: "Laporan", icon: BarChart3, testid: "nav-laporan" },
+  { to: "/followup", label: "Follow-Up", icon: BellRing, testid: "nav-followup" },
+  { to: "/profil", label: "Profil", icon: UserRound, testid: "nav-profil" },
 ];
 
 export default function Layout() {

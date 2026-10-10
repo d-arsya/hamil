@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, AlertTriangle, Baby, CalendarHeart, ChevronRight, ClipboardList, History, LogOut, Route, Bell } from "lucide-react";
+import { Activity, AlertTriangle, Baby, CalendarHeart, ChevronRight, ClipboardList, History, LogOut, Route, Bell, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import pasienApi from "../../lib/pasienApi";
 import { usePasien } from "./PasienLayout";
 
 const MENU = [
+  { to: "/ibu/janji", icon: MessageCircle, label: "Janji Temu / Kontrol", desc: "Hubungi bidan via WhatsApp" },
   { to: "/ibu/mingguan", icon: ClipboardList, label: "Pemantauan Mingguan", desc: "Checklist mingguan Buku KIA" },
   { to: "/ibu/bahaya", icon: AlertTriangle, label: "Tanda Bahaya", desc: "Kenali tanda bahaya kehamilan" },
   { to: "/ibu/persiapan", icon: Baby, label: "Persiapan Persalinan", desc: "Checklist persiapan melahirkan" },

@@ -402,6 +402,43 @@ async def change_password(data: ChangePasswordInput, user=Depends(get_current_us
     return {"ok": True}
 
 
+class NewUserInput(BaseModel):
+    username: str
+    nama: str
+    password: str
+
+
+@api_router.get("/auth/users")
+async def list_users(user=Depends(get_current_user)):
+    return await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", 1).to_list(200)
+
+
+@api_router.post("/auth/users")
+async def add_user(data: NewUserInput, user=Depends(get_current_user)):
+    username = data.username.strip().lower()
+    if not re.fullmatch(r"[a-z0-9_.]{3,30}", username):
+        raise HTTPException(status_code=400, detail="Username 3-30 karakter, hanya huruf kecil, angka, titik, atau underscore")
+    if not data.nama.strip():
+        raise HTTPException(status_code=400, detail="Nama wajib diisi")
+    if len(data.password) < 8:
+        raise HTTPException(status_code=400, detail="Password minimal 8 karakter")
+    if await db.users.find_one({"username": username}):
+        raise HTTPException(status_code=400, detail="Username sudah dipakai")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "username": username,
+        "nama": data.nama.strip(),
+        "email": "",
+        "role": "admin",
+        "password_hash": hash_password(data.password),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(doc)
+    doc.pop("_id", None)
+    doc.pop("password_hash", None)
+    return doc
+
+
 # ---------- DASHBOARD ----------
 @api_router.get("/dashboard")
 async def dashboard(user=Depends(get_current_user)):
@@ -428,10 +465,32 @@ async def dashboard(user=Depends(get_current_user)):
 @api_router.get("/patients")
 async def list_patients(user=Depends(get_current_user)):
     patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
+    pantau_docs = await db.pemantauan_harian.find(
+        {}, {"_id": 0, "patient_id": 1, "tanggal": 1, "tanda_bahaya": 1, "kondisi": 1}
+    ).sort("tanggal", -1).to_list(50000)
+    latest_pantau = {}
+    for d in pantau_docs:
+        latest_pantau.setdefault(d["patient_id"], d)
+    today = date.today()
     serialized = []
     for p in patients:
-        serialized.append(await patient_with_checkups(p))
+        s = await patient_with_checkups(p)
+        lp = latest_pantau.get(p["id"])
+        if lp and (today - date.fromisoformat(lp["tanggal"])).days <= 7:
+            s["pantau"] = {"tanggal": lp["tanggal"], "bahaya": lp.get("tanda_bahaya", []), "kondisi": lp.get("kondisi", "")}
+        serialized.append(s)
     return sorted(serialized, key=lambda p: (p["jadwal_berikutnya"] is None, p["jadwal_berikutnya"] or "9999"))
+
+
+@api_router.get("/patients/{patient_id}/pemantauan")
+async def get_pemantauan_pasien(patient_id: str, user=Depends(get_current_user)):
+    if not await db.patients.find_one({"id": patient_id}):
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    harian = await db.pemantauan_harian.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(14)
+    mingguan = await db.pemantauan_mingguan.find({"patient_id": patient_id}, {"_id": 0}).sort("minggu_ke", -1).to_list(12)
+    ttd = await db.ttd.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(30)
+    gerakan = await db.gerakan.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(14)
+    return {"harian": harian, "mingguan": mingguan, "ttd": ttd, "gerakan": gerakan}
 
 
 @api_router.post("/patients")
@@ -487,6 +546,7 @@ async def delete_patient(patient_id: str, user=Depends(get_current_user)):
     await db.gerakan.delete_many({"patient_id": patient_id})
     await db.persiapan.delete_many({"patient_id": patient_id})
     await db.pengingat.delete_many({"patient_id": patient_id})
+    await db.followup_log.delete_many({"patient_id": patient_id})
     return {"ok": True}
 
 
@@ -703,6 +763,73 @@ async def delete_template(template_id: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+# ---------- PENGATURAN KLINIK ----------
+BULAN_ID = ["", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+TEMPLATE_JANJI_DEFAULT = "Halo Bidan, saya {nama}. Saya ingin membuat janji temu untuk kontrol {kunjungan} pada {jadwal}. Mohon info waktu yang tersedia. Terima kasih."
+TEMPLATE_FOLLOWUP_DEFAULT = "Halo Ibu {nama}, salam sehat! Pengingat mingguan: jadwal kontrol Ibu berikutnya adalah {kunjungan} pada {jadwal}. Jangan lupa datang dan tetap rutin minum TTD ya, Bu. — {bidan}"
+
+
+def fmt_tgl(iso: Optional[str]) -> str:
+    if not iso:
+        return "-"
+    d = date.fromisoformat(iso)
+    return f"{d.day} {BULAN_ID[d.month]} {d.year}"
+
+
+def render_template(text: str, p: dict, st: dict, bidan: str = "") -> str:
+    return (
+        text.replace("{nama}", p["nama"])
+        .replace("{kunjungan}", st.get("kunjungan_berikutnya") or "kontrol")
+        .replace("{jadwal}", fmt_tgl(st.get("jadwal_berikutnya")))
+        .replace("{bidan}", bidan)
+    )
+
+
+async def get_pengaturan_doc() -> dict:
+    doc = await db.pengaturan.find_one({"id": "klinik"}, {"_id": 0})
+    doc = doc or {}
+    return {
+        "wa_bidan": doc.get("wa_bidan", ""),
+        "template_janji": doc.get("template_janji") or TEMPLATE_JANJI_DEFAULT,
+        "template_followup": doc.get("template_followup") or TEMPLATE_FOLLOWUP_DEFAULT,
+    }
+
+
+class PengaturanInput(BaseModel):
+    wa_bidan: Optional[str] = ""
+    template_janji: Optional[str] = ""
+    template_followup: Optional[str] = ""
+
+
+@api_router.get("/pengaturan")
+async def get_pengaturan(user=Depends(get_current_user)):
+    return await get_pengaturan_doc()
+
+
+@api_router.put("/pengaturan")
+async def put_pengaturan(data: PengaturanInput, user=Depends(get_current_user)):
+    wa = re.sub(r"\D", "", data.wa_bidan or "")
+    if wa.startswith("0"):
+        wa = "62" + wa[1:]
+    if wa and len(wa) < 9:
+        raise HTTPException(status_code=400, detail="Nomor WhatsApp tidak valid")
+    if data.template_janji and len(data.template_janji) > 2000:
+        raise HTTPException(status_code=400, detail="Template janji temu maksimal 2000 karakter")
+    if data.template_followup and len(data.template_followup) > 2000:
+        raise HTTPException(status_code=400, detail="Template follow-up maksimal 2000 karakter")
+    await db.pengaturan.update_one(
+        {"id": "klinik"},
+        {"$set": {
+            "wa_bidan": wa,
+            "template_janji": (data.template_janji or "").strip(),
+            "template_followup": (data.template_followup or "").strip(),
+        }},
+        upsert=True,
+    )
+    return await get_pengaturan_doc()
+
+
 # ---------- LAPORAN ----------
 @api_router.get("/laporan")
 async def laporan(user=Depends(get_current_user)):
@@ -740,8 +867,27 @@ async def laporan(user=Depends(get_current_user)):
         kf_stats.append({"kode": f"KF{i + 1}", "label": f"KF{i + 1} (hari {d})", "eligible": eligible, "done": done, "persen": round(done / eligible * 100) if eligible else None})
 
     tuntas = lost = 0
+    perlu_followup_list = []
+    perlu_update_list = []
     for p in patients:
         st = compute_status(p, by_patient.get(p["id"], []), today)
+        if st["status"] in ("terlambat", "hari_ini", "mendekati"):
+            perlu_followup_list.append({
+                "id": p["id"], "nama": p["nama"], "status": st["status"],
+                "jadwal_berikutnya": st["jadwal_berikutnya"], "selisih_hari": st["selisih_hari"],
+                "kunjungan_berikutnya": st["kunjungan_berikutnya"],
+            })
+        alasan_update = []
+        if not (p.get("no_rm") or "").strip() or not p.get("tanggal_lahir") or not (p.get("alamat") or "").strip():
+            alasan_update.append("Data identitas belum lengkap (No. RM / tgl lahir / alamat)")
+        if st["status"] != "selesai":
+            if st["kontrol_terakhir"]:
+                if (today - date.fromisoformat(st["kontrol_terakhir"])).days > 30:
+                    alasan_update.append("Sudah lebih dari 30 hari tidak kontrol")
+            elif p.get("created_at") and (today - date.fromisoformat(p["created_at"][:10])).days > 30:
+                alasan_update.append("Belum pernah kontrol sejak terdaftar lebih dari 30 hari")
+        if alasan_update:
+            perlu_update_list.append({"id": p["id"], "nama": p["nama"], "alasan": alasan_update})
         if st["status"] == "terlambat":
             lost += 1
             continue
@@ -789,17 +935,81 @@ async def laporan(user=Depends(get_current_user)):
         [{"nama": k, "jumlah": v, "persen": round(v / total * 100) if total else 0} for k, v in penyulit_counter.items()],
         key=lambda x: -x["jumlah"],
     )[:10]
+    perlu_followup_list.sort(key=lambda x: (x["selisih_hari"] is None, x["selisih_hari"] if x["selisih_hari"] is not None else 0))
     return {
         "total": total,
         "tuntas": tuntas,
         "tuntas_persen": round(tuntas / total * 100) if total else 0,
         "lost": lost,
         "lost_persen": round(lost / total * 100) if total else 0,
+        "perlu_followup": len(perlu_followup_list),
+        "perlu_followup_list": perlu_followup_list,
+        "perlu_update": len(perlu_update_list),
+        "perlu_update_list": perlu_update_list,
         "anc": anc_stats,
         "pnc": kf_stats,
         "penyakit": penyakit_list,
         "penyulit": penyulit_list,
     }
+
+
+# ---------- FOLLOW-UP MINGGUAN ----------
+def iso_week(d: date) -> str:
+    y, w, _ = d.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+@api_router.get("/followup")
+async def get_followup(user=Depends(get_current_user)):
+    today = date.today()
+    minggu = iso_week(today)
+    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
+    checks = await db.checkups.find({}, {"_id": 0}).to_list(50000)
+    by_patient = {}
+    for c in checks:
+        by_patient.setdefault(c["patient_id"], []).append(c)
+    logs = await db.followup_log.find({"minggu": minggu}, {"_id": 0}).to_list(5000)
+    done_map = {l["patient_id"]: l for l in logs}
+    pengaturan = await get_pengaturan_doc()
+    items = []
+    for p in patients:
+        st = compute_status(p, by_patient.get(p["id"], []), today)
+        if st["status"] == "selesai":
+            continue
+        log = done_map.get(p["id"])
+        items.append({
+            "id": p["id"],
+            "nama": p["nama"],
+            "no_wa": p["no_wa"],
+            "fase": st["fase"],
+            "status": st["status"],
+            "jadwal_berikutnya": st["jadwal_berikutnya"],
+            "kunjungan_berikutnya": st["kunjungan_berikutnya"],
+            "selisih_hari": st["selisih_hari"],
+            "prioritas": st["status"] in ("terlambat", "hari_ini", "mendekati"),
+            "sudah_followup": log is not None,
+            "followup_at": log.get("tanggal") if log else None,
+        })
+    items.sort(key=lambda x: (x["sudah_followup"], not x["prioritas"], x["jadwal_berikutnya"] or "9999"))
+    return {"minggu": minggu, "template": pengaturan["template_followup"], "items": items}
+
+
+@api_router.post("/followup/{patient_id}")
+async def mark_followup(patient_id: str, user=Depends(get_current_user)):
+    if not await db.patients.find_one({"id": patient_id}):
+        raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
+    minggu = iso_week(date.today())
+    await db.followup_log.update_one(
+        {"patient_id": patient_id, "minggu": minggu},
+        {"$set": {
+            "patient_id": patient_id,
+            "minggu": minggu,
+            "tanggal": datetime.now(timezone.utc).isoformat(),
+            "oleh": user.get("nama") or user.get("username", ""),
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "minggu": minggu}
 
 
 # ---------- IMUNISASI TT IBU HAMIL (jadwal Kemenkes) ----------
@@ -1124,7 +1334,11 @@ async def add_ttd(data: TtdInput, pu=Depends(get_current_pasien)):
     if data.status not in ("sudah", "tidak"):
         raise HTTPException(status_code=400, detail="Status tidak valid")
     tanggal = data.tanggal or date.today().isoformat()
-    parse_date(tanggal, "tanggal")
+    tgl = parse_date(tanggal, "tanggal")
+    if tgl > date.today():
+        raise HTTPException(status_code=400, detail="Tanggal tidak boleh di masa depan")
+    if tgl < date.today() and not (data.alasan or "").strip():
+        raise HTTPException(status_code=400, detail="Untuk tanggal yang sudah lewat, wajib isi alasan kenapa terlewat")
     await db.ttd.update_one(
         {"patient_id": pu["patient_id"], "tanggal": tanggal},
         {"$set": {"patient_id": pu["patient_id"], "tanggal": tanggal, "status": data.status, "alasan": data.alasan or "", "created_at": datetime.now(timezone.utc).isoformat()}},
@@ -1195,6 +1409,24 @@ async def pasien_edukasi_klinik(pu=Depends(get_current_pasien)):
     return {"fase": fase, "pesan": msgs}
 
 
+@api_router.get("/pasien/janji")
+async def pasien_janji(pu=Depends(get_current_pasien)):
+    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Data tidak ditemukan")
+    checks = await db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000)
+    st = compute_status(p, checks)
+    pengaturan = await get_pengaturan_doc()
+    return {
+        "wa_bidan": pengaturan["wa_bidan"],
+        "pesan": render_template(pengaturan["template_janji"], p, st) if pengaturan["wa_bidan"] else "",
+        "jadwal_berikutnya": st["jadwal_berikutnya"],
+        "kunjungan_berikutnya": st["kunjungan_berikutnya"],
+        "status": st["status"],
+        "selisih_hari": st["selisih_hari"],
+    }
+
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -1217,6 +1449,7 @@ async def startup():
     await db.ttd.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
     await db.gerakan.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
     await db.login_attempts.create_index("username", unique=True)
+    await db.followup_log.create_index([("patient_id", 1), ("minggu", 1)], unique=True)
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
     password = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"username": username})

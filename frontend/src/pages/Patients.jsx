@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, MessageCircle, Pencil, Trash2, Eye, Gift } from "lucide-react";
+import { Plus, Search, MessageCircle, Pencil, Trash2, Eye, Gift, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";
 import StatusBadge, { FaseBadge, RiskBadges, riskNameColor } from "../components/StatusBadge";
@@ -24,6 +24,7 @@ const FILTERS = [
 export default function Patients() {
   const { user } = useAuth();
   const [patients, setPatients] = useState(null);
+  const todayStr = new Date().toLocaleDateString("sv-SE");
   const [filter, setFilter] = useState("semua");
   const [q, setQ] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -145,6 +146,20 @@ export default function Patients() {
                       {p.kupon_eligible && !p.kupon_diklaim && (
                         <span data-testid={`kupon-badge-${p.id}`} title="Berhak kupon pijat bayi gratis" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                           <Gift className="w-3 h-3" /> Kupon
+                        </span>
+                      )}
+                      {p.pantau?.bahaya?.length > 0 && (
+                        <span
+                          data-testid={`bahaya-badge-${p.id}`}
+                          title={`Tanda bahaya dilaporkan pasien (${fmtDate(p.pantau.tanggal)}): ${p.pantau.bahaya.join(", ")}`}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold"
+                        >
+                          <AlertTriangle className="w-3 h-3" /> Bahaya
+                        </span>
+                      )}
+                      {p.pantau && !(p.pantau.bahaya?.length > 0) && p.pantau.tanggal === todayStr && (
+                        <span data-testid={`pantau-baru-badge-${p.id}`} title="Pasien mengisi pemantauan hari ini" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold">
+                          Pantau baru
                         </span>
                       )}
                     </div>

@@ -11,6 +11,7 @@ import PatientForm from "../components/PatientForm";
 import CheckupForm from "../components/CheckupForm";
 import WaReminder from "../components/WaReminder";
 import Timeline from "../components/Timeline";
+import PemantauanPasien from "../components/PemantauanPasien";
 import ImunisasiPanel from "../components/ImunisasiPanel";
 import ImunisasiTTPanel from "../components/ImunisasiTTPanel";
 import Modal from "../components/Modal";
@@ -330,6 +331,8 @@ export default function PatientDetail() {
       </div>
 
       <Timeline timeline={data.timeline} />
+
+      <PemantauanPasien patientId={p.id} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className={cardCls}>
