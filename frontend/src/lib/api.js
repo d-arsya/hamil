@@ -1,7 +1,12 @@
 import axios from "axios";
 
+const baseURL =
+  process.env.REACT_APP_USE_PROXY === "true" || !process.env.REACT_APP_BACKEND_URL
+    ? "/api"
+    : `${process.env.REACT_APP_BACKEND_URL}/api`;
+
 const api = axios.create({
-  baseURL: `${process.env.REACT_APP_BACKEND_URL}/api`,
+  baseURL,
   withCredentials: true,
 });
 
