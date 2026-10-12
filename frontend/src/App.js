@@ -17,6 +17,7 @@ const Profil = lazy(() => import("./pages/Profil"));
 const PasienLayout = lazy(() => import("./pages/pasien/PasienLayout"));
 const Beranda = lazy(() => import("./pages/pasien/Beranda"));
 const Janji = lazy(() => import("./pages/pasien/Janji"));
+const TandaVital = lazy(() => import("./pages/pasien/TandaVital"));
 const Pemantauan = lazy(() => import("./pages/pasien/Pemantauan"));
 const Mingguan = lazy(() => import("./pages/pasien/Mingguan"));
 const TTD = lazy(() => import("./pages/pasien/TTD"));
@@ -62,6 +63,7 @@ function App() {
           <Route element={<PasienProtected />}>
             <Route path="/ibu" element={<Beranda />} />
             <Route path="/ibu/janji" element={<Janji />} />
+            <Route path="/ibu/ttv" element={<TandaVital />} />
             <Route path="/ibu/pantau" element={<Pemantauan />} />
             <Route path="/ibu/mingguan" element={<Mingguan />} />
             <Route path="/ibu/ttd" element={<TTD />} />

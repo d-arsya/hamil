@@ -283,3 +283,23 @@ def _cleanup_all(admin_headers, request):
                 requests.delete(f"{API}/patients/{p['id']}", headers=admin_headers)
     except Exception as e:
         print("cleanup error:", e)
+
+
+
+# ---------- TTV PORTAL ----------
+class TestTTVPortal:
+    def test_ttv_reflects_checkup(self, admin_headers, pasien_headers, test_patient):
+        r = requests.post(f"{API}/patients/{test_patient}/checkups", json={
+            "patient_id": test_patient, "tanggal": date.today().isoformat(), "jenis": "anc", "ke": 3,
+            "sistolik": 150, "diastolik": 95, "suhu": 36.8, "spo2": 98, "nadi": 88, "rr": 18, "lila": 24.5,
+        }, headers=admin_headers)
+        assert r.status_code == 200, r.text
+        rows = requests.get(f"{API}/pasien/ttv", headers=pasien_headers).json()
+        assert isinstance(rows, list) and len(rows) >= 1
+        row = rows[0]
+        assert row["sistolik"] == 150 and row["diastolik"] == 95 and row["ke"] == 3
+        assert row["suhu"] == 36.8 and row["spo2"] == 98
+
+    def test_ttv_requires_auth(self):
+        r = requests.get(f"{API}/pasien/ttv")
+        assert r.status_code in (401, 403)

@@ -113,6 +113,12 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Stabilitas test: TestLockout & TestBruteForce kini memakai user khusus (test_lockout_user / test_bruteforce_user) + pembersihan login_attempts terscope per-user; test auth-negatif membersihkan cookie session. Full suite stabil: 152/152 pass
 - Catatan yang disengaja tidak diubah: rewrite form besar (CheckupForm/PatientForm) & type-hint file test — risiko regresi tinggi tanpa manfaat fungsional, sudah tercakup test
 
+## Iterasi 16 (Okt 2026) — Follow-up WA fix & TTV portal pasien
+- Fix tombol "Kirim WA & Tandai" di /followup: window.open kini dipanggil sinkron saat klik (sebelumnya setelah await → diblokir popup blocker); guard nomor WA kosong; penandaan follow-up tetap via POST /api/followup/{id}
+- TTV tampil di portal pasien: endpoint GET /api/pasien/ttv (20 kontrol terakhir) + halaman /ibu/ttv (TandaVital.jsx) — tiap tanda vital dievaluasi thd batas normal (TD ≥140/90 waspada, ≥160/110 bahaya; suhu ≥37,5; nadi >100; RR >20; SpO2 <95; LiLa <23,5 KEK) dengan chip merah/kuning/hijau + edukasi per tanda + banner status terkini + kartu "Kenali Tanda Vital"
+- Akses: kartu "Tanda Vital Saya" di Beranda portal + menu Lainnya
+- Test baru TestTTVPortal (2 test) di test_portal_pasien.py — 27/27 pass
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)

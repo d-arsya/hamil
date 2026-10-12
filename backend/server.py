@@ -1449,6 +1449,29 @@ async def pasien_edukasi_klinik(pu=Depends(get_current_pasien)):
     return {"fase": fase, "pesan": msgs}
 
 
+@api_router.get("/pasien/ttv")
+async def pasien_ttv(pu=Depends(get_current_pasien)):
+    checks = await db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).sort("tanggal", -1).to_list(20)
+    return [
+        {
+            "tanggal": c["tanggal"],
+            "jenis": c.get("jenis"),
+            "ke": c.get("ke"),
+            "berat_badan": c.get("berat_badan"),
+            "sistolik": c.get("sistolik"),
+            "diastolik": c.get("diastolik"),
+            "tfu": c.get("tfu"),
+            "suhu": c.get("suhu"),
+            "nadi": c.get("nadi"),
+            "rr": c.get("rr"),
+            "spo2": c.get("spo2"),
+            "lila": c.get("lila"),
+            "tinggi_badan": c.get("tinggi_badan"),
+        }
+        for c in checks
+    ]
+
+
 @api_router.get("/pasien/janji")
 async def pasien_janji(pu=Depends(get_current_pasien)):
     p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})

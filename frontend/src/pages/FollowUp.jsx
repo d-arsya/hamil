@@ -32,15 +32,20 @@ export default function FollowUp() {
       .replaceAll("{jadwal}", fmtDate(p.jadwal_berikutnya))
       .replaceAll("{bidan}", bidan);
 
-  const kirim = async (p) => {
-    try {
-      await api.post(`/followup/${p.id}`);
-      window.open(waUrl(p.no_wa, renderPesan(p)), "_blank");
-      toast.success(`${p.nama} ditandai sudah di-follow up minggu ini`);
-      load();
-    } catch (err) {
-      toast.error(apiError(err, "Gagal menandai follow-up"));
+  const kirim = (p) => {
+    if (!(p.no_wa || "").trim()) {
+      toast.error("Nomor WA pasien kosong — lengkapi dulu di data pasien");
+      return;
     }
+    // Buka WA sinkron saat klik agar tidak diblokir popup blocker
+    window.open(waUrl(p.no_wa, renderPesan(p)), "_blank");
+    api
+      .post(`/followup/${p.id}`)
+      .then(() => {
+        toast.success(`${p.nama} ditandai sudah di-follow up minggu ini`);
+        load();
+      })
+      .catch((err) => toast.error(apiError(err, "Gagal menandai follow-up")));
   };
 
   const simpanTemplate = async () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Pill, Baby, AlertTriangle, CalendarClock, CheckCircle2, Circle, MessageCircle } from "lucide-react";
+import { Activity, Pill, Baby, AlertTriangle, CalendarClock, CheckCircle2, Circle, MessageCircle, HeartPulse } from "lucide-react";
 import pasienApi from "../../lib/pasienApi";
 import { usePasien } from "./PasienLayout";
 import { fmtDate, usiaLabel } from "../../lib/utils-id";
@@ -113,6 +113,16 @@ export default function Beranda() {
         <div className="text-sm">
           <b className="text-slate-900">Buat Janji Kontrol</b>
           <div className="text-xs text-slate-500">Hubungi bidan via WhatsApp, sekali klik</div>
+        </div>
+      </Link>
+
+      <Link to="/ibu/ttv" data-testid="beranda-ttv-link" className={`flex items-center gap-3 ${card} !py-4`}>
+        <div className="w-10 h-10 rounded-2xl bg-[#FDF2F5] flex items-center justify-center shrink-0">
+          <HeartPulse className="w-5 h-5 text-[#C02650]" />
+        </div>
+        <div className="text-sm">
+          <b className="text-slate-900">Tanda Vital Saya</b>
+          <div className="text-xs text-slate-500">Hasil pengukuran saat kontrol & artinya</div>
         </div>
       </Link>
 

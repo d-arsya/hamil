@@ -7,6 +7,7 @@ import { usePasien } from "./PasienLayout";
 
 const MENU = [
   { to: "/ibu/janji", icon: MessageCircle, label: "Janji Temu / Kontrol", desc: "Hubungi bidan via WhatsApp" },
+  { to: "/ibu/ttv", icon: Activity, label: "Tanda Vital Saya", desc: "Hasil pengukuran saat kontrol & artinya" },
   { to: "/ibu/mingguan", icon: ClipboardList, label: "Pemantauan Mingguan", desc: "Checklist mingguan Buku KIA" },
   { to: "/ibu/bahaya", icon: AlertTriangle, label: "Tanda Bahaya", desc: "Kenali tanda bahaya kehamilan" },
   { to: "/ibu/persiapan", icon: Baby, label: "Persiapan Persalinan", desc: "Checklist persiapan melahirkan" },
