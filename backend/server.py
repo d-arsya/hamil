@@ -36,7 +36,7 @@ PASIEN_COOKIE = "bidanku_pasien"
 
 
 def set_auth_cookie(response: Response, name: str, token: str, max_age: int):
-    response.set_cookie(name, token, httponly=True, secure=True, samesite="lax", max_age=max_age, path="/")
+    response.set_cookie(name, token, httponly=True, secure=True, samesite="none", max_age=max_age, path="/")
 
 # Jadwal ANC 6x (minggu ke-) dan Kunjungan Nifas (hari ke-)
 ANC_WEEKS = [12, 16, 26, 32, 36, 39]
