@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2, Gift, Check, Smartphone, Copy,
+  ArrowLeft, Baby, ClipboardPlus, MessageCircle, Pencil, Trash2, Gift, Check, Smartphone, Copy, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { apiError } from "../lib/api";
@@ -12,6 +12,7 @@ import WaReminder from "../components/WaReminder";
 import Timeline from "../components/Timeline";
 import PemantauanPasien from "../components/PemantauanPasien";
 import PatientCharts from "../components/PatientCharts";
+import { cetakResumeKontrol } from "../lib/resume";
 import ImunisasiPanel from "../components/ImunisasiPanel";
 import ImunisasiTTPanel from "../components/ImunisasiTTPanel";
 import Modal from "../components/Modal";
@@ -46,6 +47,7 @@ export default function PatientDetail() {
   const [data, setData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [checkupOpen, setCheckupOpen] = useState(false);
+  const [editCheckup, setEditCheckup] = useState(null);
   const [waOpen, setWaOpen] = useState(false);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const emptyDelivery = { tanggal: "", nama_anak: "", jenis_kelamin_anak: "", cara_lahir: "", tempat_lahir: "", penolong_persalinan: "", masalah_persalinan: "" };
@@ -255,6 +257,7 @@ export default function PatientDetail() {
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Data Pasien</h3>
           <div className="grid grid-cols-2 gap-4">
             <InfoItem label="No. RM" value={p.no_rm} />
+            <InfoItem label="No. BPJS" value={p.no_bpjs} />
             <InfoItem label="Usia" value={p.usia_tahun != null ? `${p.usia_tahun} tahun` : "-"} />
             <InfoItem label="No. WhatsApp" value={p.no_wa} />
             <InfoItem label="Alamat" value={p.alamat} />
@@ -409,13 +412,31 @@ export default function PatientDetail() {
                     {!c.rencana_tindak_lanjut && !c.jenis_kb && !c.imunisasi_diberikan && "-"}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <button
-                      data-testid={`checkup-delete-button-${c.id}`}
-                      onClick={() => deleteCheckup(c.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        data-testid={`checkup-resume-button-${c.id}`}
+                        onClick={() => { if (!cetakResumeKontrol(c, p, user?.nama)) toast.error("Izinkan pop-up untuk mengunduh PDF resume"); }}
+                        title="Unduh resume kontrol (PDF)"
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
+                      <button
+                        data-testid={`checkup-edit-button-${c.id}`}
+                        onClick={() => setEditCheckup(c)}
+                        title="Edit data kontrol"
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        data-testid={`checkup-delete-button-${c.id}`}
+                        onClick={() => deleteCheckup(c.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -425,7 +446,8 @@ export default function PatientDetail() {
       </div>
 
       <PatientForm open={editOpen} onClose={() => setEditOpen(false)} onSaved={load} initial={p} />
-      <CheckupForm open={checkupOpen} onClose={() => setCheckupOpen(false)} onSaved={load} patient={p} />
+      <CheckupForm open={checkupOpen} onClose={() => setCheckupOpen(false)} onSaved={load} patient={p} checkups={checkups} />
+      <CheckupForm open={Boolean(editCheckup)} onClose={() => setEditCheckup(null)} onSaved={load} patient={p} checkups={checkups} initial={editCheckup} />
 
       <Modal open={Boolean(akunBaru)} onClose={() => setAkunBaru(null)} title="Akun Portal Pasien" testid="akun-modal">
         {akunBaru && (

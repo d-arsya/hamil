@@ -120,6 +120,7 @@ class RiwayatItem(BaseModel):
 class PatientInput(BaseModel):
     nama: str
     no_rm: Optional[str] = ""
+    no_bpjs: Optional[str] = ""
     no_wa: str
     alamat: Optional[str] = ""
     tanggal_lahir: Optional[str] = None
@@ -155,6 +156,22 @@ class CheckupInput(BaseModel):
     rr: Optional[int] = None
     lila: Optional[float] = None
     tinggi_badan: Optional[float] = None
+    # Detail bayi saat ANC (hasil USG/pemeriksaan)
+    letak_plasenta: Optional[str] = ""
+    ketuban: Optional[str] = ""
+    tbj: Optional[int] = None
+    jumlah_janin: Optional[str] = ""
+    keadaan_janin: Optional[str] = ""
+    lokasi_kehamilan: Optional[str] = ""
+    presentasi: Optional[str] = ""
+    jk_janin: Optional[str] = ""
+    # Pemeriksaan fisik bayi saat PNC
+    bayi_bb: Optional[int] = None
+    bayi_pb: Optional[float] = None
+    bayi_lk: Optional[float] = None
+    bayi_suhu: Optional[float] = None
+    bayi_tali_pusat: Optional[str] = ""
+    bayi_ikterus: Optional[str] = ""
 
 
 class DeliveryInput(BaseModel):
@@ -321,6 +338,7 @@ def serialize_patient(p: dict, checkups: list, imunisasi_done: Optional[list] = 
         "id": p["id"],
         "nama": p["nama"],
         "no_rm": p.get("no_rm", ""),
+        "no_bpjs": p.get("no_bpjs", ""),
         "no_wa": p["no_wa"],
         "alamat": p.get("alamat", ""),
         "tanggal_lahir": p.get("tanggal_lahir"),
@@ -624,11 +642,49 @@ async def add_checkup(patient_id: str, data: CheckupInput, user=Depends(get_curr
         "rr": data.rr,
         "lila": data.lila,
         "tinggi_badan": data.tinggi_badan,
+        "letak_plasenta": data.letak_plasenta or "",
+        "ketuban": data.ketuban or "",
+        "tbj": data.tbj,
+        "jumlah_janin": data.jumlah_janin or "",
+        "keadaan_janin": data.keadaan_janin or "",
+        "lokasi_kehamilan": data.lokasi_kehamilan or "",
+        "presentasi": data.presentasi or "",
+        "jk_janin": data.jk_janin or "",
+        "bayi_bb": data.bayi_bb,
+        "bayi_pb": data.bayi_pb,
+        "bayi_lk": data.bayi_lk,
+        "bayi_suhu": data.bayi_suhu,
+        "bayi_tali_pusat": data.bayi_tali_pusat or "",
+        "bayi_ikterus": data.bayi_ikterus or "",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.checkups.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+CHECKUP_EDITABLE_FIELDS = [
+    "tanggal", "sistolik", "diastolik", "berat_badan", "tinggi_fundus", "djj",
+    "spo2", "suhu", "nadi", "rr", "lila", "tinggi_badan",
+    "letak_plasenta", "ketuban", "tbj", "jumlah_janin", "keadaan_janin",
+    "lokasi_kehamilan", "presentasi", "jk_janin",
+    "bayi_bb", "bayi_pb", "bayi_lk", "bayi_suhu", "bayi_tali_pusat", "bayi_ikterus",
+    "jenis_kb", "kontrol_kb", "imunisasi_diberikan",
+]
+
+
+@api_router.put("/checkups/{checkup_id}")
+async def update_checkup(checkup_id: str, data: CheckupInput, user=Depends(get_current_user)):
+    if not await db.checkups.find_one({"id": checkup_id}):
+        raise HTTPException(status_code=404, detail="Data kontrol tidak ditemukan")
+    if data.tanggal and parse_date(data.tanggal, "tanggal kontrol") > date.today():
+        raise HTTPException(status_code=400, detail="Tanggal kontrol tidak boleh di masa depan")
+    updates = {f: getattr(data, f) for f in CHECKUP_EDITABLE_FIELDS}
+    updates["keluhan"] = data.keluhan or ""
+    updates["catatan"] = data.catatan or ""
+    updates["rencana_tindak_lanjut"] = data.rencana_tindak_lanjut or ""
+    await db.checkups.update_one({"id": checkup_id}, {"$set": updates})
+    return {"ok": True}
 
 
 @api_router.delete("/checkups/{checkup_id}")
