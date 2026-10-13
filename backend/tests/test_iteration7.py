@@ -116,7 +116,8 @@ class TestLaporan:
         client.post(f"{BASE_URL}/api/patients/{pid}/checkups", json={"jenis": "anc", "ke": 1})
         after = client.get(f"{BASE_URL}/api/laporan").json()
         after_k1 = next(a for a in after["anc"] if a["kode"] == "K1")
-        assert after_k1["done"] == before_done_k1 + 1
+        # >= karena worker paralel lain bisa ikut menambah K1 di antara before/after
+        assert after_k1["done"] >= before_done_k1 + 1
 
 
 # ---- /api/templates (shared collection) ----

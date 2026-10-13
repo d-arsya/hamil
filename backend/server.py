@@ -679,7 +679,9 @@ async def update_checkup(checkup_id: str, data: CheckupInput, user=Depends(get_c
         raise HTTPException(status_code=404, detail="Data kontrol tidak ditemukan")
     if data.tanggal and parse_date(data.tanggal, "tanggal kontrol") > date.today():
         raise HTTPException(status_code=400, detail="Tanggal kontrol tidak boleh di masa depan")
-    updates = {f: getattr(data, f) for f in CHECKUP_EDITABLE_FIELDS}
+    updates = {f: getattr(data, f) for f in CHECKUP_EDITABLE_FIELDS if f != "tanggal"}
+    if data.tanggal:
+        updates["tanggal"] = data.tanggal
     updates["keluhan"] = data.keluhan or ""
     updates["catatan"] = data.catatan or ""
     updates["rencana_tindak_lanjut"] = data.rencana_tindak_lanjut or ""

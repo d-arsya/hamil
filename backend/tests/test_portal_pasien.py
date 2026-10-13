@@ -68,8 +68,17 @@ def akun_cred(admin_headers, test_patient):
     return data
 
 
+def clear_pasien_attempts(username):
+    """Bersihkan lockout/attempts untuk akun pasien tertentu (anti-flaky saat suite paralel)."""
+    import subprocess
+    subprocess.run(["mongosh", os.environ.get("DB_NAME", "test_database"), "--quiet",
+                    "--eval", f'db.login_attempts.deleteMany({{username: "pasien:{username}"}})'],
+                   capture_output=True, check=False)
+
+
 @pytest.fixture(scope="module")
 def pasien_token(akun_cred):
+    clear_pasien_attempts(akun_cred["username"])
     r = requests.post(f"{API}/pasien/login", json={"username": akun_cred["username"], "password": akun_cred["password"]})
     assert r.status_code == 200, r.text
     assert "token" in r.json()
@@ -118,6 +127,8 @@ class TestLogin:
     def test_login_wrong_password(self, akun_cred):
         r = requests.post(f"{API}/pasien/login", json={"username": akun_cred["username"], "password": "wrong"})
         assert r.status_code == 401
+        # bersihkan attempts agar tidak menumpuk jadi lockout saat suite paralel
+        clear_pasien_attempts(akun_cred["username"])
 
     def test_login_unknown_user(self):
         r = requests.post(f"{API}/pasien/login", json={"username": "doesnotexist9999", "password": "x"})
@@ -273,14 +284,12 @@ class TestEdukasiSync:
 
 # ---------- CLEANUP ----------
 @pytest.fixture(scope="module", autouse=True)
-def _cleanup_all(admin_headers, request):
+def _cleanup_all(admin_headers, test_patient):
     yield
-    # Teardown — delete any TEST_portal_* patients (and their cascaded data in server-side delete)
+    # Teardown — hanya hapus pasien milik modul ini (jangan sapu semua TEST_portal_*:
+    # worker paralel lain bisa sedang memakai pasiennya → cascade delete akun → 401)
     try:
-        pts = requests.get(f"{API}/patients", headers=admin_headers).json()
-        for p in pts:
-            if (p.get("nama") or "").startswith("TEST_portal_"):
-                requests.delete(f"{API}/patients/{p['id']}", headers=admin_headers)
+        requests.delete(f"{API}/patients/{test_patient}", headers=admin_headers)
     except Exception as e:
         print("cleanup error:", e)
 

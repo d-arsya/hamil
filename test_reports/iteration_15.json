@@ -1,0 +1,55 @@
+{
+  "summary": "Iterasi 17 BidanKu diuji: backend 9/9 pytest test_iterasi17_fitur.py PASS; full suite 157/163 pass (6 failures di test_portal_pasien.py karena brute-force lockout dari parallel workers — flaky pre-existing, PASS saat run isolasi). Frontend klinik: semua testid iter17 ada dan berfungsi (patient-form-no-bpjs setelah No. RM, No. BPJS tampil di detail, LiLa dihapus dari form kontrol, seksi Detail Bayi ANC dan Pemeriksaan Fisik Bayi PNC muncul sesuai jenis, chips Tandai sebelumnya hadir, tbj sembunyi saat jenis=kf, tombol edit (2) & resume (2) per baris kontrol, edit mode mengunci jenis/ke dan prefill data lama (sistolik=145), save sukses, resume membuka tab baru). Regresi: Dashboard, Follow-Up, Laporan render tanpa error overlay. Tidak ada bug fungsional yang ditemukan untuk iter17.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/pasien/*", "issue": "6 test di test_portal_pasien.py (TestTtd.test_invalid_status/test_get_ttd, TestGerakan.test_increment/test_get, TestPersiapanPengingat.test_persiapan_persist/test_pengingat_persist) gagal dengan 401 saat full suite karena akun pasien terkunci (lockout 5x gagal) oleh test paralel (test_login_wrong_password dari TestLogin / regression_iter2). Saat run isolasi: 27/27 PASS."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verifications": {
+    "backend_iterasi17_pytest": "9/9 PASS (TestNoBpjs 2, TestCheckupFields 3, TestEditCheckup 4)",
+    "backend_full_suite_isolasi": "27/27 portal_pasien PASS; full 157/163 (6 flaky lockout) — tidak ada regresi dari iter17",
+    "ui_patient_form_bpjs": "patient-form-no-bpjs visible=True; DOM order: no_rm sebelum no_bpjs ✓",
+    "ui_patient_detail_bpjs": "label 'No. BPJS' hadir di InfoItem detail pasien",
+    "ui_checkup_form": {
+      "lila_removed": true,
+      "jenis_default_anc": "anc",
+      "anc_bayi_section_visible_on_anc": true,
+      "tandai_sebelumnya_chips": true,
+      "nifas_section_on_kf": true,
+      "bayi_bb_on_kf": true,
+      "tbj_hidden_on_kf": true
+    },
+    "ui_checkup_edit": "jenis+ke disabled di edit mode; sistolik prefill='145' (data dari kontrol existing); keluhan modifikasi + submit → form tertutup ✓",
+    "ui_checkup_resume": "tombol resume klik → tab baru terbuka (window.open) ✓ tidak ada error JS",
+    "ui_regression": {"dashboard": "no error", "followup": "no error", "laporan": "no error"},
+    "lila_display_history": "PatientDetail.jsx:39 masih menampilkan `c.lila` untuk kontrol lama yg sudah tercatat lila-nya (short-circuit bila null) — sesuai spec (hanya form input yang dihapus)."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iterasi17_fitur.py",
+    "/app/test_reports/pytest/iter15_i17.xml",
+    "/app/test_reports/pytest/iter15_full.xml"
+  ],
+  "action_items": [
+    "(Opsional, non-blocking) Reset collection db.login_attempts di conftest fixture setup/teardown atau unikkan akun pasien per test module untuk menghilangkan flaky lockout di test_portal_pasien.py saat full suite dijalankan paralel."
+  ],
+  "critical_code_review_comments": [
+    "CheckupForm.jsx baris 19-60: edit-mode logic rapi, mengunci jenis/ke dan prefill benar. useEffect dengan dependency [open, initial] terlihat benar.",
+    "PatientDetail.jsx:39 — c.lila masih dirender untuk kontrol legacy; aman karena short-circuit null, dan sesuai spec (hanya dihapus dari form input). Pertimbangkan menandai 'LiLa (legacy)' bila ingin konsistensi UX.",
+    "server.py CHECKUP_EDITABLE_FIELDS membatasi field editable (jenis/ke tidak termasuk) ✓ sesuai requirement.",
+    "test_portal_pasien.py: pasien account dipakai bersama antar test — tanpa reset login_attempts, 5x gagal login dari TestLogin.test_login_wrong_password memicu 429 pada test subsekuen di worker lain."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% isolasi / 96.3% full-suite (lockout flaky)", "frontend": "100%"},
+  "test_credentials": "admin / Bidan#Aman2026xY9 (/app/memory/test_credentials.md)",
+  "seed_data_creation": "test fixture buat/hapus TEST_i17_* otomatis. UI test tidak membuat data permanen (klik cancel). 2 checkup existing pada pasien pertama diedit (keluhan diubah ke 'TEST_EDIT_iter17 keluhan') — pertimbangkan rollback manual jika ingin bersih.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter17 selesai, semua fitur bekerja. Flaky 6 test di test_portal_pasien.py karena pasien account dipakai bersama + lockout 429 saat paralel. Fix opsional: tambahkan autouse fixture di conftest.py untuk reset db.login_attempts sebelum setiap module. Backend env var REACT_APP_BACKEND_URL perlu di-export saat run pytest manual (atau tambahkan di conftest.py from frontend/.env).",
+  "rca_of_the_issue": "Tidak ada bug fungsional untuk iter17. Flaky test portal_pasien: TestLogin.test_login_wrong_password memicu 5+ login gagal, trigger lockout 15-menit untuk akun 'sitirahmawat2748', lalu test lain yang bergantung pada pasien_headers fixture (dibuat sekali per module) menerima 401/429. Mitigasi: reset db.login_attempts di conftest, atau pakai akun pasien terpisah untuk TestLogin negative cases."
+}

@@ -119,6 +119,20 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Akses: kartu "Tanda Vital Saya" di Beranda portal + menu Lainnya
 - Test baru TestTTVPortal (2 test) di test_portal_pasien.py — 27/27 pass
 
+## Iterasi 17 (Okt 2026) — BPJS, detail bayi, edit kontrol, resume PDF
+- Merge perubahan git remote user (setupProxy.js + vercel.json proxy, samesite=lax→none untuk deployment Vercel, hapus emergentintegrations dari requirements)
+- No. BPJS opsional: PatientInput.no_bpjs + serializer + PatientForm (setelah No. RM) + InfoItem di detail pasien
+- LiLa dihapus dari form catat kontrol (data lama tetap tampil di histori/portal)
+- Form kontrol PNC: seksi Pemeriksaan Fisik Bayi (bayi_bb gr, bayi_pb cm, bayi_lk cm, bayi_suhu, bayi_tali_pusat, bayi_ikterus)
+- Form kontrol ANC: seksi Detail Bayi (djj, letak_plasenta, ketuban, tbj, jumlah_janin, keadaan_janin, lokasi_kehamilan, presentasi, jk_janin)
+- Ceklis kunjungan sebelumnya tanpa data (chips K1-K6/KF1-KF4, tercatat dengan catatan "Ditandai manual")
+- Edit riwayat kontrol: PUT /api/checkups/{id} (CHECKUP_EDITABLE_FIELDS, jenis/ke immutable, tanggal tidak boleh masa depan) + tombol edit per baris di detail pasien
+- Resume kontrol export PDF: lib/resume.js cetakResumeKontrol() — window print (Save as PDF), tombol dokumen per baris kontrol
+- Test baru test_iterasi17_fitur.py (9 test); fix flaky lockout test_portal_pasien.py (clear_pasien_attempts terscope per akun)
+- Fix regresi nyata yang ditemukan saat testing: PUT /api/checkups partial body men-set tanggal=null → compute_status 500 (dashboard & laporan down). Fix: tanggal hanya di-update bila dikirim + data terkontaminasi diperbaiki via mongosh
+- Stabilitas suite paralel: teardown test_portal_pasien di-scope ke pasien modul sendiri (sebelumnya menghapus semua TEST_portal_* → cascade delete akun worker lain → 401); assertion count laporan global di-longgarkan == → >= (race antar worker)
+- Full suite: 163/163 pass; testing agent iter15: frontend 100%, tidak ada bug fungsional
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)
