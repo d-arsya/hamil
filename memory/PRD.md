@@ -133,6 +133,10 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Stabilitas suite paralel: teardown test_portal_pasien di-scope ke pasien modul sendiri (sebelumnya menghapus semua TEST_portal_* → cascade delete akun worker lain → 401); assertion count laporan global di-longgarkan == → >= (race antar worker)
 - Full suite: 163/163 pass; testing agent iter15: frontend 100%, tidak ada bug fungsional
 
+## Dokumentasi
+- `/app/docs/PERUBAHAN-13-OKT-2026.md` — changelog iterasi 17 (fitur, perbaikan bug, hasil testing)
+- `/app/docs/SERVER.md` — referensi dependency server, env vars, koleksi MongoDB, perintah operasional, struktur rute
+
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)
 - P1: Multi-user (banyak bidan, role admin/staf)
