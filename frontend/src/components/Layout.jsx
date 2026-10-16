@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import api, { apiError } from "../lib/api";
 import Modal from "./Modal";
+import NotifikasiBell from "./NotifikasiBell";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
@@ -137,6 +138,9 @@ export default function Layout() {
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="text-sm text-slate-500" data-testid="topbar-date">{today}</div>
+          <div className="ml-auto">
+            <NotifikasiBell />
+          </div>
         </header>
         <main className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
           <Outlet />

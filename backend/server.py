@@ -1101,6 +1101,91 @@ async def mark_followup(patient_id: str, user=Depends(get_current_user)):
     return {"ok": True, "minggu": minggu}
 
 
+# ---------- NOTIFIKASI PEMANTAUAN MANDIRI PASIEN ----------
+@api_router.get("/notifikasi")
+async def get_notifikasi(user=Depends(get_current_user)):
+    batas = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    patients = await db.patients.find({}, {"_id": 0, "id": 1, "nama": 1}).to_list(5000)
+    nama_map = {p["id"]: p["nama"] for p in patients}
+
+    async def ambil(koleksi):
+        return await db[koleksi].find({"created_at": {"$gte": batas}}, {"_id": 0}).to_list(5000)
+
+    items = []
+    for d in await ambil("pemantauan_harian"):
+        if d["patient_id"] not in nama_map:
+            continue
+        bahaya = d.get("tanda_bahaya", [])
+        items.append({
+            "tipe": "pantau",
+            "patient_id": d["patient_id"],
+            "nama": nama_map[d["patient_id"]],
+            "judul": "Pemantauan harian",
+            "ringkasan": f"Kondisi: {d.get('kondisi') or '-'}" + (f" — Tanda bahaya: {', '.join(bahaya)}" if bahaya else ""),
+            "level": "bahaya" if bahaya else "info",
+            "waktu": d.get("created_at"),
+        })
+    for d in await ambil("pemantauan_mingguan"):
+        if d["patient_id"] not in nama_map:
+            continue
+        items.append({
+            "tipe": "mingguan",
+            "patient_id": d["patient_id"],
+            "nama": nama_map[d["patient_id"]],
+            "judul": f"Checklist mingguan ke-{d.get('minggu_ke')}",
+            "ringkasan": "Ada keluhan pada checklist mingguan" if d.get("ada_bahaya") else "Checklist mingguan terisi, tidak ada keluhan",
+            "level": "bahaya" if d.get("ada_bahaya") else "info",
+            "waktu": d.get("created_at"),
+        })
+    for d in await ambil("ttd"):
+        if d["patient_id"] not in nama_map:
+            continue
+        sudah = d.get("status") == "sudah"
+        items.append({
+            "tipe": "ttd",
+            "patient_id": d["patient_id"],
+            "nama": nama_map[d["patient_id"]],
+            "judul": "TTD/MMS",
+            "ringkasan": "Sudah minum tablet tambah darah" if sudah else f"Tidak minum — {d.get('alasan') or 'tanpa alasan'}",
+            "level": "info" if sudah else "waspada",
+            "waktu": d.get("created_at"),
+        })
+    gerakan_docs = await db.gerakan.find(
+        {"$or": [{"updated_at": {"$gte": batas}}, {"updated_at": None, "created_at": {"$gte": batas}}]},
+        {"_id": 0},
+    ).to_list(5000)
+    for d in gerakan_docs:
+        if d["patient_id"] not in nama_map:
+            continue
+        jumlah = d.get("jumlah", 0)
+        items.append({
+            "tipe": "gerakan",
+            "patient_id": d["patient_id"],
+            "nama": nama_map[d["patient_id"]],
+            "judul": "Gerakan bayi",
+            "ringkasan": f"{jumlah}x gerakan tercatat hari ini" + (" — di bawah 10x, perlu diwaspadai" if jumlah < 10 else ""),
+            "level": "waspada" if jumlah < 10 else "info",
+            "waktu": d.get("updated_at") or d.get("created_at"),
+        })
+
+    items.sort(key=lambda x: x["waktu"] or "", reverse=True)
+    items = items[:30]
+    seen = await db.notif_seen.find_one({"user_id": user["id"]}, {"_id": 0})
+    last_seen = (seen or {}).get("last_seen", "")
+    unread = sum(1 for i in items if (i["waktu"] or "") > last_seen)
+    return {"items": items, "unread": unread}
+
+
+@api_router.post("/notifikasi/read")
+async def tandai_notifikasi_dibaca(user=Depends(get_current_user)):
+    await db.notif_seen.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"user_id": user["id"], "last_seen": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
 # ---------- IMUNISASI TT IBU HAMIL (jadwal Kemenkes) ----------
 TT_SCHEDULE = [
     {"kode": "tt1", "nama": "TT 1", "dari": None, "interval_hari": 0, "ket": "kontak pertama / pendaftaran"},
@@ -1455,7 +1540,7 @@ async def add_gerakan(pu=Depends(get_current_pasien)):
     tanggal = date.today().isoformat()
     await db.gerakan.update_one(
         {"patient_id": pu["patient_id"], "tanggal": tanggal},
-        {"$inc": {"jumlah": 1}, "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}},
+        {"$inc": {"jumlah": 1}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}, "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
     doc = await db.gerakan.find_one({"patient_id": pu["patient_id"], "tanggal": tanggal}, {"_id": 0})
@@ -1571,6 +1656,7 @@ async def startup():
     await db.gerakan.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
     await db.login_attempts.create_index("username", unique=True)
     await db.followup_log.create_index([("patient_id", 1), ("minggu", 1)], unique=True)
+    await db.notif_seen.create_index("user_id", unique=True)
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
     password = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"username": username})

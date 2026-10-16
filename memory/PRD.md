@@ -133,6 +133,12 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Stabilitas suite paralel: teardown test_portal_pasien di-scope ke pasien modul sendiri (sebelumnya menghapus semua TEST_portal_* → cascade delete akun worker lain → 401); assertion count laporan global di-longgarkan == → >= (race antar worker)
 - Full suite: 163/163 pass; testing agent iter15: frontend 100%, tidak ada bug fungsional
 
+## Iterasi 18 (Okt 2026) — Notifikasi pemantauan mandiri pasien
+- GET /api/notifikasi: agregasi isian pasien 7 hari terakhir (pemantauan harian, checklist mingguan, TTD, gerakan bayi) dengan level bahaya/waspada/info + unread count per user (koleksi notif_seen); POST /api/notifikasi/read menandai semua dibaca
+- add_gerakan kini set updated_at tiap increment (untuk kesegaran notifikasi)
+- Frontend: komponen NotifikasiBell.jsx di header Layout — polling tiap 30 detik, badge merah jumlah unread, panel dropdown (klik item → detail pasien, auto mark-read saat dibuka)
+- Test baru test_iterasi18_notif.py (4 test); terverifikasi: 4/4 pass + screenshot UI
+
 ## Dokumentasi
 - `/app/docs/PERUBAHAN-13-OKT-2026.md` — changelog iterasi 17 (fitur, perbaikan bug, hasil testing)
 - `/app/docs/SERVER.md` — referensi dependency server, env vars, koleksi MongoDB, perintah operasional, struktur rute
