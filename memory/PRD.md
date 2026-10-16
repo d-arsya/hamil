@@ -141,7 +141,8 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 
 ## Dokumentasi
 - `/app/docs/PERUBAHAN-13-OKT-2026.md` — changelog iterasi 17 (fitur, perbaikan bug, hasil testing)
-- `/app/docs/SERVER.md` — referensi dependency server, env vars, koleksi MongoDB, perintah operasional, struktur rute
+- `/app/docs/PERUBAHAN-16-OKT-2026.md` — changelog iterasi 18 (notifikasi pemantauan mandiri pasien)
+- `/app/docs/SERVER.md` — referensi dependency server, env vars, koleksi MongoDB, perintah operasional, struktur rute (diperbarui 16 Okt: koleksi notif_seen + rute /api/notifikasi)
 
 ## Backlog
 - P1: Pengingat WA otomatis terjadwal (cron harian + integrasi API WhatsApp seperti Fonnte)

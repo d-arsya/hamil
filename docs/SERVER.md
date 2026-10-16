@@ -68,6 +68,7 @@ Kedua service dikelola **supervisor** dengan hot reload (perubahan kode otomatis
 | `edukasi`, `templates` | Pesan edukasi & template WA |
 | `pengaturan` | Pengaturan klinik (WA bidan, template janji & follow-up) |
 | `followup_log` | Penanda follow-up mingguan per pasien |
+| `notif_seen` | Penanda notifikasi terakhir dibaca per akun bidan (sejak 16 Okt 2026) |
 | `login_attempts` | Proteksi brute-force (lockout 5x → 15 menit) |
 
 ## Perintah Operasional
@@ -97,4 +98,4 @@ cd /app/frontend && yarn add <paket>
 
 - **Klinik/bidan**: `/login` → `/` (dashboard), `/pasien`, `/pasien/:id`, `/edukasi`, `/laporan`, `/followup`, `/profil`
 - **Portal pasien**: `/ibu/login` → `/ibu`, `/ibu/ttv`, `/ibu/janji`, `/ibu/pantau`, `/ibu/ttd`, `/ibu/gerakan`, `/ibu/bahaya`, `/ibu/persiapan`, `/ibu/edukasi`, `/ibu/perjalanan`, `/ibu/riwayat`, `/ibu/pengaturan`
-- **API**: `/api/auth/*` (klinik), `/api/patients/*` + `/api/checkups/*` (data klinik), `/api/pasien/*` (portal), `/api/laporan`, `/api/followup`, `/api/pengaturan`
+- **API**: `/api/auth/*` (klinik), `/api/patients/*` + `/api/checkups/*` (data klinik), `/api/pasien/*` (portal), `/api/laporan`, `/api/followup`, `/api/pengaturan`, `/api/notifikasi` (lonceng notifikasi, sejak 16 Okt 2026)
