@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+import asyncio
 import os
 import re
 import secrets
@@ -375,9 +376,29 @@ def serialize_patient(p: dict, checkups: list, imunisasi_done: Optional[list] = 
 
 
 async def patient_with_checkups(p: dict) -> dict:
-    checks = await db.checkups.find({"patient_id": p["id"]}, {"_id": 0}).to_list(1000)
-    imu = await db.imunisasi.find({"patient_id": p["id"]}, {"_id": 0}).to_list(100)
+    checks, imu = await asyncio.gather(
+        db.checkups.find({"patient_id": p["id"]}, {"_id": 0}).to_list(1000),
+        db.imunisasi.find({"patient_id": p["id"]}, {"_id": 0}).to_list(100),
+    )
     return serialize_patient(p, checks, imu)
+
+
+CHECKUP_PROJ = {"_id": 0, "patient_id": 1, "jenis": 1, "ke": 1, "tanggal": 1, "rencana_tindak_lanjut": 1}
+
+
+async def serialize_patients_bulk(patients: list) -> list:
+    """Serialisasi banyak pasien tanpa N+1: 2 query paralel + join in-memory per patient_id."""
+    checkups, imunisasi = await asyncio.gather(
+        db.checkups.find({}, CHECKUP_PROJ).to_list(50000),
+        db.imunisasi.find({}, {"_id": 0, "patient_id": 1, "kode": 1}).to_list(50000),
+    )
+    by_patient = {}
+    for c in checkups:
+        by_patient.setdefault(c["patient_id"], []).append(c)
+    imu_by_patient = {}
+    for r in imunisasi:
+        imu_by_patient.setdefault(r["patient_id"], []).append(r)
+    return [serialize_patient(p, by_patient.get(p["id"], []), imu_by_patient.get(p["id"], [])) for p in patients]
 
 
 # ---------- AUTH ----------
@@ -468,9 +489,7 @@ async def add_user(data: NewUserInput, user=Depends(get_current_user)):
 @api_router.get("/dashboard")
 async def dashboard(user=Depends(get_current_user)):
     patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
-    serialized = []
-    for p in patients:
-        serialized.append(await patient_with_checkups(p))
+    serialized = await serialize_patients_bulk(patients)
     stats = {
         "total": len(serialized),
         "hamil": sum(1 for p in serialized if p["fase"] != "nifas"),
@@ -489,32 +508,36 @@ async def dashboard(user=Depends(get_current_user)):
 # ---------- PATIENTS ----------
 @api_router.get("/patients")
 async def list_patients(user=Depends(get_current_user)):
-    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
-    pantau_docs = await db.pemantauan_harian.find(
-        {}, {"_id": 0, "patient_id": 1, "tanggal": 1, "tanda_bahaya": 1, "kondisi": 1}
-    ).sort("tanggal", -1).to_list(50000)
+    today = date.today()
+    batas_pantau = (today - timedelta(days=7)).isoformat()
+    patients, pantau_docs = await asyncio.gather(
+        db.patients.find({}, {"_id": 0}).to_list(5000),
+        db.pemantauan_harian.find(
+            {"tanggal": {"$gte": batas_pantau}}, {"_id": 0, "patient_id": 1, "tanggal": 1, "tanda_bahaya": 1, "kondisi": 1}
+        ).sort("tanggal", -1).to_list(5000),
+    )
     latest_pantau = {}
     for d in pantau_docs:
         latest_pantau.setdefault(d["patient_id"], d)
-    today = date.today()
-    serialized = []
-    for p in patients:
-        s = await patient_with_checkups(p)
-        lp = latest_pantau.get(p["id"])
-        if lp and (today - date.fromisoformat(lp["tanggal"])).days <= 7:
+    serialized = await serialize_patients_bulk(patients)
+    for s in serialized:
+        lp = latest_pantau.get(s["id"])
+        if lp:
             s["pantau"] = {"tanggal": lp["tanggal"], "bahaya": lp.get("tanda_bahaya", []), "kondisi": lp.get("kondisi", "")}
-        serialized.append(s)
     return sorted(serialized, key=lambda p: (p["jadwal_berikutnya"] is None, p["jadwal_berikutnya"] or "9999"))
 
 
 @api_router.get("/patients/{patient_id}/pemantauan")
 async def get_pemantauan_pasien(patient_id: str, user=Depends(get_current_user)):
-    if not await db.patients.find_one({"id": patient_id}):
+    pasien, harian, mingguan, ttd, gerakan = await asyncio.gather(
+        db.patients.find_one({"id": patient_id}, {"_id": 0}),
+        db.pemantauan_harian.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(14),
+        db.pemantauan_mingguan.find({"patient_id": patient_id}, {"_id": 0}).sort("minggu_ke", -1).to_list(12),
+        db.ttd.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(30),
+        db.gerakan.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(14),
+    )
+    if not pasien:
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
-    harian = await db.pemantauan_harian.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(14)
-    mingguan = await db.pemantauan_mingguan.find({"patient_id": patient_id}, {"_id": 0}).sort("minggu_ke", -1).to_list(12)
-    ttd = await db.ttd.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(30)
-    gerakan = await db.gerakan.find({"patient_id": patient_id}, {"_id": 0}).sort("tanggal", -1).to_list(14)
     return {"harian": harian, "mingguan": mingguan, "ttd": ttd, "gerakan": gerakan}
 
 
@@ -536,12 +559,14 @@ async def create_patient(data: PatientInput, user=Depends(get_current_user)):
 
 @api_router.get("/patients/{patient_id}")
 async def get_patient(patient_id: str, user=Depends(get_current_user)):
-    p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    p, checks, imu = await asyncio.gather(
+        db.patients.find_one({"id": patient_id}, {"_id": 0}),
+        db.checkups.find({"patient_id": patient_id}, {"_id": 0}).to_list(1000),
+        db.imunisasi.find({"patient_id": patient_id}, {"_id": 0}).to_list(100),
+    )
     if not p:
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
-    checks = await db.checkups.find({"patient_id": patient_id}, {"_id": 0}).to_list(1000)
     checks.sort(key=lambda c: c["tanggal"])
-    imu = await db.imunisasi.find({"patient_id": patient_id}, {"_id": 0}).to_list(100)
     return {"pasien": serialize_patient(p, checks, imu), "checkups": checks, "timeline": build_timeline(p, checks)}
 
 
@@ -561,17 +586,11 @@ async def delete_patient(patient_id: str, user=Depends(get_current_user)):
     result = await db.patients.delete_one({"id": patient_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Pasien tidak ditemukan")
-    await db.checkups.delete_many({"patient_id": patient_id})
-    await db.imunisasi.delete_many({"patient_id": patient_id})
-    await db.imunisasi_tt.delete_many({"patient_id": patient_id})
-    await db.patient_users.delete_many({"patient_id": patient_id})
-    await db.pemantauan_harian.delete_many({"patient_id": patient_id})
-    await db.pemantauan_mingguan.delete_many({"patient_id": patient_id})
-    await db.ttd.delete_many({"patient_id": patient_id})
-    await db.gerakan.delete_many({"patient_id": patient_id})
-    await db.persiapan.delete_many({"patient_id": patient_id})
-    await db.pengingat.delete_many({"patient_id": patient_id})
-    await db.followup_log.delete_many({"patient_id": patient_id})
+    await asyncio.gather(*[
+        db[c].delete_many({"patient_id": patient_id})
+        for c in ("checkups", "imunisasi", "imunisasi_tt", "patient_users", "pemantauan_harian",
+                  "pemantauan_mingguan", "ttd", "gerakan", "persiapan", "pengingat", "followup_log")
+    ])
     return {"ok": True}
 
 
@@ -998,8 +1017,10 @@ def _profil_risiko(patients: list, total: int) -> tuple:
 
 @api_router.get("/laporan")
 async def laporan(user=Depends(get_current_user)):
-    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
-    checks = await db.checkups.find({}, {"_id": 0}).to_list(50000)
+    patients, checks = await asyncio.gather(
+        db.patients.find({}, {"_id": 0}).to_list(5000),
+        db.checkups.find({}, CHECKUP_PROJ).to_list(50000),
+    )
     by_patient = {}
     for c in checks:
         by_patient.setdefault(c["patient_id"], []).append(c)
@@ -1052,14 +1073,16 @@ def iso_week(d: date) -> str:
 async def get_followup(user=Depends(get_current_user)):
     today = date.today()
     minggu = iso_week(today)
-    patients = await db.patients.find({}, {"_id": 0}).to_list(5000)
-    checks = await db.checkups.find({}, {"_id": 0}).to_list(50000)
+    patients, checks, logs, pengaturan = await asyncio.gather(
+        db.patients.find({}, {"_id": 0}).to_list(5000),
+        db.checkups.find({}, CHECKUP_PROJ).to_list(50000),
+        db.followup_log.find({"minggu": minggu}, {"_id": 0}).to_list(5000),
+        get_pengaturan_doc(),
+    )
     by_patient = {}
     for c in checks:
         by_patient.setdefault(c["patient_id"], []).append(c)
-    logs = await db.followup_log.find({"minggu": minggu}, {"_id": 0}).to_list(5000)
     done_map = {l["patient_id"]: l for l in logs}
-    pengaturan = await get_pengaturan_doc()
     items = []
     for p in patients:
         st = compute_status(p, by_patient.get(p["id"], []), today)
@@ -1420,12 +1443,14 @@ async def get_akun_pasien(patient_id: str, user=Depends(get_current_user)):
 
 @api_router.get("/pasien/me")
 async def pasien_me(pu=Depends(get_current_pasien)):
-    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})
+    p, checks, imu = await asyncio.gather(
+        db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0}),
+        db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000),
+        db.imunisasi.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(100),
+    )
     if not p:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan")
-    checks = await db.checkups.find({"patient_id": p["id"]}, {"_id": 0}).to_list(1000)
     checks.sort(key=lambda c: c["tanggal"])
-    imu = await db.imunisasi.find({"patient_id": p["id"]}, {"_id": 0}).to_list(100)
     return {"pasien": serialize_patient(p, checks, imu), "timeline": build_timeline(p, checks), "checkups": checks}
 
 
@@ -1585,8 +1610,10 @@ async def put_pengingat(data: ItemsInput, pu=Depends(get_current_pasien)):
 
 @api_router.get("/pasien/edukasi-klinik")
 async def pasien_edukasi_klinik(pu=Depends(get_current_pasien)):
-    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})
-    checks = await db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000)
+    p, checks = await asyncio.gather(
+        db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0}),
+        db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000),
+    )
     fase = compute_status(p, checks)["fase"]
     msgs = await db.edukasi.find({"fase": fase}, {"_id": 0}).sort("created_at", 1).to_list(50)
     return {"fase": fase, "pesan": msgs}
@@ -1617,12 +1644,14 @@ async def pasien_ttv(pu=Depends(get_current_pasien)):
 
 @api_router.get("/pasien/janji")
 async def pasien_janji(pu=Depends(get_current_pasien)):
-    p = await db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0})
+    p, checks, pengaturan = await asyncio.gather(
+        db.patients.find_one({"id": pu["patient_id"]}, {"_id": 0}),
+        db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000),
+        get_pengaturan_doc(),
+    )
     if not p:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan")
-    checks = await db.checkups.find({"patient_id": pu["patient_id"]}, {"_id": 0}).to_list(1000)
     st = compute_status(p, checks)
-    pengaturan = await get_pengaturan_doc()
     return {
         "wa_bidan": pengaturan["wa_bidan"],
         "pesan": render_template(pengaturan["template_janji"], p, st) if pengaturan["wa_bidan"] else "",
@@ -1646,17 +1675,36 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    await db.users.create_index("username", unique=True)
-    await db.checkups.create_index("patient_id")
-    await db.imunisasi.create_index("patient_id")
-    await db.imunisasi_tt.create_index("patient_id")
-    await db.patient_users.create_index("username", unique=True)
-    await db.pemantauan_harian.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
-    await db.ttd.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
-    await db.gerakan.create_index([("patient_id", 1), ("tanggal", 1)], unique=True)
-    await db.login_attempts.create_index("username", unique=True)
-    await db.followup_log.create_index([("patient_id", 1), ("minggu", 1)], unique=True)
-    await db.notif_seen.create_index("user_id", unique=True)
+    await asyncio.gather(
+        db.users.create_index("username", unique=True),
+        db.checkups.create_index("patient_id"),
+        db.imunisasi.create_index("patient_id"),
+        db.imunisasi_tt.create_index("patient_id"),
+        db.patient_users.create_index("username", unique=True),
+        db.pemantauan_harian.create_index([("patient_id", 1), ("tanggal", 1)], unique=True),
+        db.ttd.create_index([("patient_id", 1), ("tanggal", 1)], unique=True),
+        db.gerakan.create_index([("patient_id", 1), ("tanggal", 1)], unique=True),
+        db.login_attempts.create_index("username", unique=True),
+        db.followup_log.create_index([("patient_id", 1), ("minggu", 1)], unique=True),
+        db.notif_seen.create_index("user_id", unique=True),
+        # Index lookup custom id — menghindari COLLSCAN di tiap request terautentikasi
+        db.patients.create_index("id"),
+        db.users.create_index("id"),
+        db.patient_users.create_index("id"),
+        db.patient_users.create_index("patient_id"),
+        db.checkups.create_index("id"),
+        db.imunisasi.create_index("id"),
+        db.imunisasi_tt.create_index("id"),
+        db.edukasi.create_index("id"),
+        db.templates.create_index("id"),
+        # Index filter umum
+        db.pemantauan_harian.create_index("tanggal"),
+        db.pemantauan_mingguan.create_index([("patient_id", 1), ("minggu_ke", 1)]),
+        db.persiapan.create_index("patient_id"),
+        db.pengingat.create_index("patient_id"),
+        db.followup_log.create_index("minggu"),
+        db.edukasi.create_index("fase"),
+    )
     username = os.environ.get("ADMIN_USERNAME", "admin").lower()
     password = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"username": username})

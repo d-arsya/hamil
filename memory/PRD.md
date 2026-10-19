@@ -139,6 +139,13 @@ User meminta website monitoring ibu hamil dari awal menjadi pasien sampai masa n
 - Frontend: komponen NotifikasiBell.jsx di header Layout — polling tiap 30 detik, badge merah jumlah unread, panel dropdown (klik item → detail pasien, auto mark-read saat dibuka)
 - Test baru test_iterasi18_notif.py (4 test); terverifikasi: 4/4 pass + screenshot UI
 
+## Iterasi 18b (Okt 2026) — Optimasi performa query (dari audit agen user)
+- Hapus N+1: helper serialize_patients_bulk (asyncio.gather + proyeksi field + join in-memory) dipakai list_patients & dashboard; pemantauan_harian difilter 7 hari di query
+- asyncio.gather di: laporan, followup, get_patient, pasien_me, pasien_janji, pasien_edukasi_klinik, pemantauan detail pasien, delete_patient (11 delete paralel)
+- +15 index MongoDB baru (id lookup, patient_id, tanggal, minggu, fase) dibuat paralel saat startup — non-unik agar aman utk data produksi
+- Hasil: /api/patients & /api/dashboard ~0,14s (dari ~40s); data tidak tersentuh
+- Full suite 166/167 (1 flaky race paralel pre-existing, lolos saat isolasi)
+
 ## Dokumentasi
 - `/app/docs/PERUBAHAN-13-OKT-2026.md` — changelog iterasi 17 (fitur, perbaikan bug, hasil testing)
 - `/app/docs/PERUBAHAN-16-OKT-2026.md` — changelog iterasi 18 (notifikasi pemantauan mandiri pasien)
